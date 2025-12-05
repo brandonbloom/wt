@@ -1,0 +1,21 @@
+$ rm -rf tmprepo
+$ mkdir tmprepo
+$ cd tmprepo
+$ export GIT_AUTHOR_NAME=wt-test
+$ export GIT_AUTHOR_EMAIL=wt@example.com
+$ export GIT_COMMITTER_NAME=wt-test
+$ export GIT_COMMITTER_EMAIL=wt@example.com
+$ export GIT_AUTHOR_DATE='2000-01-01T00:00:00Z'
+$ export GIT_COMMITTER_DATE='2000-01-01T00:00:00Z'
+$ git init -b main >/dev/null
+$ echo hi > README.md
+$ git add README.md
+$ git commit -m init >/dev/null
+$ ../bin/wt init >/dev/null
+$ cd main
+$ ../../bin/wt new demo-branch --base main
+2 Preparing worktree (new branch 'demo-branch')
+1 HEAD is now at 79cb6b2 init
+1 Created demo-branch at /Users/bbloom/Projects/wt/tmprepo/demo-branch (run `cd /Users/bbloom/Projects/wt/tmprepo/demo-branch`)
+$ cd ../..
+$ rm -rf tmprepo

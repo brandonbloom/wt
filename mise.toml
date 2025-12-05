@@ -2,9 +2,13 @@
 _.path = "{{ cwd }}/bin"
 GOCACHE = "{{ cwd }}/.gocache"
 GOMODCACHE = "{{ cwd }}/.gopath"
+GOBIN = "{{ cwd }}/bin"
 
 [tasks.build]
 run = "go build -o bin/ ./cmd/wt "
 
 [tasks.test]
-run = "go test ./..."
+run = """
+go test ./...
+go tool github.com/deref/transcript check transcripts/*.cmdt
+"""

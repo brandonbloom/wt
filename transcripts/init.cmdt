@@ -1,0 +1,12 @@
+$ rm -rf tmprepo
+$ mkdir tmprepo
+$ cd tmprepo
+$ git init -b main >/dev/null
+$ echo hi > README.md
+$ git add README.md
+$ git commit -m init >/dev/null
+$ ../bin/wt init
+1 Converted repository to wt layout at /Users/bbloom/Projects/wt/tmprepo
+1 Please cd into /Users/bbloom/Projects/wt/tmprepo/main
+$ cd ..
+$ rm -rf tmprepo

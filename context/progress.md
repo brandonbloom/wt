@@ -68,5 +68,5 @@ This file tracks every requirement from `context/spec.md`. Update the checkboxes
 ## Methodology & Testing
 - [ ] Follow strict TDD with failing tests first (unit or transcript) before implementing behavior.
 - [ ] Use `git@github.com:brandonbloom/wt-playground.git` when exercising real worktree flows.
-- [ ] Cover user-facing CLI behavior with transcript `.cmdt` fixtures and keep them updated via `transcript update`.
-- [ ] Ensure transcript fixtures live under `transcripts/` and remain version-controlled.
+- [x] Cover user-facing CLI behavior with transcript `.cmdt` fixtures and keep them updated via `transcript update`.
+- [x] Ensure transcript fixtures live under `transcripts/` and remain version-controlled.

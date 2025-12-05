@@ -1,0 +1,23 @@
+$ rm -rf tmprepo
+$ mkdir tmprepo
+$ cd tmprepo
+$ export GIT_AUTHOR_NAME=wt-test
+$ export GIT_AUTHOR_EMAIL=wt@example.com
+$ export GIT_COMMITTER_NAME=wt-test
+$ export GIT_COMMITTER_EMAIL=wt@example.com
+$ export GIT_AUTHOR_DATE='2000-01-01T00:00:00Z'
+$ export GIT_COMMITTER_DATE='2000-01-01T00:00:00Z'
+$ git init -b main >/dev/null
+$ echo hi > README.md
+$ git add README.md
+$ git commit -m init >/dev/null
+$ ../bin/wt init >/dev/null
+$ cd main
+$ ../../bin/wt new demo-branch --base main >/dev/null 2>&1
+$ cd ../demo-branch
+$ export WT_NOW='2000-01-03T00:00:00Z'
+$ ../../bin/wt
+1 * demo-branch  demo-branch ↑0 ↓0    2 days ago (PR: pending)
+1   main         main ↑0 ↓0           2 days ago (PR: pending)
+$ cd ../..
+$ rm -rf tmprepo

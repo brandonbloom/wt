@@ -1,0 +1,17 @@
+$ bin/wt activate
+1 # wt shell integration
+1 wt() {
+1   local _wt_tmp
+1   _wt_tmp="$(mktemp "${TMPDIR:-/tmp}/wt.XXXXXX")" || return 1
+1   WT_WRAPPER_ACTIVE=1 WT_INSTRUCTION_FILE="$_wt_tmp" command wt "$@"
+1   local _wt_status=$?
+1   if [ -f "$_wt_tmp" ]; then
+1     local _wt_target
+1     _wt_target="$(cat "$_wt_tmp")"
+1     rm -f "$_wt_tmp"
+1     if [ $_wt_status -eq 0 ] && [ -n "$_wt_target" ]; then
+1       builtin cd "$_wt_target"
+1     fi
+1   fi
+1   return $_wt_status
+1 }

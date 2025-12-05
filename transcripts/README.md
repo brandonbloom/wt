@@ -4,23 +4,27 @@ This directory contains [transcript](https://github.com/deref/transcript) fixtur
 
 ## Workflow
 
-1. Install the helper tool once:
+1. Record or update a session (no manual install required thanks to the Go `tool` directive):
 
    ```bash
-   go install github.com/deref/transcript/cmd/transcript@latest
+   go tool github.com/deref/transcript shell -o transcripts/init.cmdt
    ```
 
-2. Record or update a session:
+2. Keep the fixtures up to date as commands evolve:
 
    ```bash
-   transcript shell -o transcripts/init.cmdt
-   ```
-
-3. Keep the fixtures up to date as commands evolve:
-
-   ```bash
-   transcript check transcripts/*.cmdt
+   go tool github.com/deref/transcript check transcripts/*.cmdt
    ```
 
 The `context/transcript.md` guide in this repository dives deeper into the format if you need a refresher.
 
+## Test Harness
+
+`transcripts/entrypoint.sh` bootstraps a disposable wt project, stubs `gh`, and
+optionally simulates the shell wrapper. Use it inside transcripts to avoid
+duplicating setup/teardown boilerplate:
+
+```bash
+$ ./transcripts/entrypoint.sh --activate-wrapper --worktree main ../../bin/wt doctor
+healthy!
+```

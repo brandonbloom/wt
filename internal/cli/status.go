@@ -37,7 +37,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	now := time.Now()
+	now := currentTimeOverride()
 	for _, wt := range worktrees {
 		status, err := collectWorktreeStatus(wt)
 		if err != nil {
@@ -120,4 +120,13 @@ func isWithin(child, parent string) bool {
 		return false
 	}
 	return rel == "." || !strings.HasPrefix(rel, "..")
+}
+
+func currentTimeOverride() time.Time {
+	if override := os.Getenv("WT_NOW"); override != "" {
+		if t, err := time.Parse(time.RFC3339, override); err == nil {
+			return t
+		}
+	}
+	return time.Now()
 }

@@ -9,11 +9,13 @@ import (
 
 	"github.com/brandonbloom/wt/internal/gitutil"
 	"github.com/brandonbloom/wt/internal/project"
+	"github.com/brandonbloom/wt/internal/shellbridge"
 	"github.com/brandonbloom/wt/internal/timefmt"
 	"github.com/spf13/cobra"
 )
 
 func runStatus(cmd *cobra.Command, args []string) error {
+	statusPreflight(cmd)
 	proj, err := loadProjectFromWD()
 	if err != nil {
 		return err
@@ -129,4 +131,11 @@ func currentTimeOverride() time.Time {
 		}
 	}
 	return time.Now()
+}
+
+func statusPreflight(cmd *cobra.Command) {
+	if shellbridge.Active() && shellbridge.InstructionFile() != "" {
+		return
+	}
+	fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s\n", shellbridge.ErrWrapperMissing)
 }

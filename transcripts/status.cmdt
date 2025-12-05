@@ -17,6 +17,7 @@ $ ../../bin/wt new demo-branch --base main >/dev/null 2>&1
 $ cd ../demo-branch
 $ export WT_NOW='2000-01-03T00:00:00Z'
 $ ../../bin/wt
+2 warning: shell wrapper missing; add `eval "$(wt activate)"` to your shell rc
 1 * demo-branch  demo-branch ↑0 ↓0    2 days ago (PR: pending)
 1   main         main ↑0 ↓0           2 days ago (PR: pending)
 $ cd ../..

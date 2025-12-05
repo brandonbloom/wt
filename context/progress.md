@@ -41,7 +41,7 @@ This file tracks every requirement from `context/spec.md`. Update the checkboxes
 ## Shell Integration (`wt activate`)
 - [x] `wt activate` emits the shell script that installs/updates the wrapper function.
 - [x] Wrapper shadows the binary, exports markers for directory change instructions, and can be reinstalled via `eval "$(wt activate)"`.
-- [ ] `wt status` proactively detects a missing wrapper and guides the user before rendering output.
+- [x] `wt status` proactively detects a missing wrapper and guides the user before rendering output.
 
 ## Status Dashboard (`wt`)
 - [x] Prints exactly one status line per worktree with a marker for the current worktree.

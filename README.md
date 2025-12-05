@@ -1,40 +1,38 @@
 # wt
 
-`wt` is an opinionated helper for managing Git worktrees as first-class project roots. It converts repositories into `<project>/<worktree>` directories, keeps developer-specific configuration outside the repo, and automates short-lived worktree creation with memorable names.
+Opinionated worktree helper for repositories that live as `<project>/<worktree>` directories.
 
-## Installation
+## Install
 
 ```bash
 go install github.com/brandonbloom/wt/cmd/wt@latest
 eval "$(wt activate)"
 ```
 
-The `activate` step installs a shell function named `wt` that wraps the Go binary so commands like `wt new` can change your current working directory after completing their work. When the wrapper is missing, commands still run but will remind you to install it.
+The `activate` step installs the shell wrapper so subcommands (e.g., `wt new`) can change your `cwd`. The binary warns when the wrapper is missing.
 
-## Getting Started
+## Everyday Usage
 
-1. Clone a repository with `wt clone <url>` **or** run `wt init` inside an existing Git repo. Initialization converts the repo into the `<project>/<branch>` layout and creates a `.wt/` directory next to the worktrees.
-2. Use `wt new` to spin up additional worktrees. Names are adjective–noun pairs by default (e.g., `bold-raven`), but you can supply an explicit name or `--base=<branch>` to choose the starting point.
-3. Run `wt` with no subcommand to see the dashboard of worktrees, their branch state, and recency.
-4. Periodically run `wt doctor` (or `wt doctor --verbose`) to confirm Git/GitHub/direnv prerequisites are still healthy.
+- `wt clone <url>` – clone a repo and immediately convert it to the `<project>/<branch>` layout.
+- `wt init` – convert an existing repo in-place.
+- `wt new [name] [--base=<branch>]` – create a new branch/worktree (names default to curated adjective–noun pairs). After creation the wrapper `cd`s into the new tree and runs the configured bootstrap command.
+- `wt` – dashboard with one line per worktree showing branch state, relative “time ago” updates, and PR placeholders.
+- `wt doctor [--verbose]` – verify git/gh installations, layout, config, and wrapper state.
 
-## Configuration (`.wt/config.toml`)
+Project-specific settings live in `<project>/.wt/config.toml` next to the worktrees so you can tune the default branch and bootstrap commands without touching the git repo.
 
-Each project stores developer-specific configuration at `<project>/.wt/config.toml`. The file is intentionally outside the Git repository so you can tune settings without creating noise for collaborators.
+## Building
 
-```toml
-default_branch = "main"
+Local builds use [`mise`](https://github.com/jdx/mise) to keep `bin/` on your `PATH` and pin Go caches inside the repo:
 
-[bootstrap]
-run = "make deps"
+```bash
+mise run build
 ```
 
-- `default_branch` (string) **must** match the repository's default branch on GitHub. `wt doctor` verifies this by asking the GitHub CLI for the canonical branch.
-- `[bootstrap].run` is an arbitrary shell snippet that runs inside every freshly created worktree **after** the `git worktree add` step succeeds. The command inherits stdin/stdout/stderr and blocks the `wt new` flow until it finishes. Return codes other than zero abort the flow with the captured error so you can fix bootstrap problems quickly.
+This runs `go build -o bin/ ./cmd/wt` with `GOCACHE={{repo}}/.gocache` and `GOMODCACHE={{repo}}/.gopath`. Testing and contributor workflow live in `DEVELOPING.md`.
 
-Edit this file directly—it's regular TOML—and rerun `wt doctor` if you want to validate the changes.
+## Docs & License
 
-## Transcript Tests
-
-Integration tests live under `transcripts/` as [command transcripts](https://github.com/deref/transcript). Use `transcript check transcripts/*.cmdt` to keep them in sync whenever you change CLI behavior. See `context/transcript.md` for a deep dive into the format and toolchain.
-
+- MIT License (see `LICENSE` in the upstream repo).
+- Contributor instructions live in `DEVELOPING.md`.
+- Full product spec and transcript guidance live under `context/`.

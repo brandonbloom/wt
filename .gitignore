@@ -1,3 +1,6 @@
+# Build output.
+bin/
+
 # Codex's preferred sandbox-friendly paths.
 .gocache/
 .gopath/

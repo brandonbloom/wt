@@ -7,6 +7,7 @@
 - CLI entrypoint: `wt` (a shell wrapper/function that shadows the Go binary of the same name so it can change the caller’s `cwd`; when the wrapper is missing, the binary still runs and reports the misconfiguration)
 - Default behavior: running `wt` with no subcommand prints a status dashboard
 - Scope: extremely minimal and opinionated, targeting Brandon Bloom’s personal workflow (others using it is a bonus)
+- Logging/output: avoid timestamped loggers (e.g., Go’s default `log` package formatter) since the CLI should finish fast enough that timestamps add no value; stick to plain stdout/stderr messaging instead.
 
 ## Directory & Worktree Assumptions
 - A project that uses `wt` is converted into a directory containing multiple worktrees (e.g., `~/Projects/iaf` becomes `~/Projects/iaf/main`, `~/Projects/iaf/<other-worktree>`).
@@ -56,7 +57,7 @@
 - Running `wt` with no subcommand prints a dashboard view of all worktrees, rendered as exactly one status line per worktree (current worktree line should include an additional marker/prefix to highlight it).
 - Required data per worktree:
   - Git details (branch name, ahead/behind vs upstream, dirty state).
-  - Timestamp derived as: newest file mtime when the worktree is dirty or has staged changes; otherwise use the HEAD commit timestamp. Display in a consistent timezone (e.g., ISO-8601 in local time).
+- Timestamp derived as: newest file mtime when the worktree is dirty or has staged changes; otherwise use the HEAD commit timestamp. Display the timestamp as a friendly relative string (e.g., `3s ago`, `2 min ago`, `yesterday 2pm`, `4 days ago`) instead of raw ISO text.
   - If the branch has an associated GitHub pull request, display its status.
 - When run inside a specific worktree, highlight that worktree with additional detail while still summarizing the others.
 - Output should respect the “silence is golden” philosophy where possible (e.g., avoid gratuitous chatter when nothing noteworthy changed).

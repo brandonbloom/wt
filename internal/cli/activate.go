@@ -11,7 +11,7 @@ func newActivateCommand() *cobra.Command {
 		Use:   "activate",
 		Short: "Print the shell wrapper that enables wt to change your cwd",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Fprintln(cmd.OutOrStdout(), wrapperScript)
+			fmt.Fprint(cmd.OutOrStdout(), wrapperScript)
 			return nil
 		},
 	}

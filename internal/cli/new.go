@@ -115,7 +115,7 @@ func determineBaseBranch(flag string, proj *project.Project) (string, error) {
 }
 
 func addWorktree(cmd *cobra.Command, proj *project.Project, name, baseBranch, targetPath string) error {
-	args := []string{"-C", proj.DefaultWorktreePath, "worktree", "add", targetPath, baseBranch}
+	args := []string{"-C", proj.DefaultWorktreePath, "worktree", "add", "-b", name, targetPath, baseBranch}
 	gitCmd := exec.Command("git", args...)
 	gitCmd.Stdout = cmd.OutOrStdout()
 	gitCmd.Stderr = cmd.ErrOrStderr()

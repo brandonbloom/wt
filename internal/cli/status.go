@@ -9,6 +9,7 @@ import (
 
 	"github.com/brandonbloom/wt/internal/gitutil"
 	"github.com/brandonbloom/wt/internal/project"
+	"github.com/brandonbloom/wt/internal/timefmt"
 	"github.com/spf13/cobra"
 )
 
@@ -36,6 +37,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	now := time.Now()
 	for _, wt := range worktrees {
 		status, err := collectWorktreeStatus(wt)
 		if err != nil {
@@ -43,7 +45,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 			continue
 		}
 		status.Current = wt.Name == current
-		printWorktreeStatus(cmd, status)
+		printWorktreeStatus(cmd, status, now)
 	}
 
 	return nil
@@ -91,7 +93,7 @@ func collectWorktreeStatus(wt project.Worktree) (*worktreeStatus, error) {
 	}, nil
 }
 
-func printWorktreeStatus(cmd *cobra.Command, status *worktreeStatus) {
+func printWorktreeStatus(cmd *cobra.Command, status *worktreeStatus, now time.Time) {
 	prefix := "  "
 	if status.Current {
 		prefix = "* "
@@ -100,13 +102,14 @@ func printWorktreeStatus(cmd *cobra.Command, status *worktreeStatus) {
 	if status.Dirty {
 		dirtyMarker = "!"
 	}
+	relative := timefmt.Relative(status.Timestamp, now)
 	fmt.Fprintf(
 		cmd.OutOrStdout(),
 		"%s%-12s %-20s %s %s\n",
 		prefix,
 		status.Name,
 		fmt.Sprintf("%s%s ↑%d ↓%d", status.Branch, dirtyMarker, status.Ahead, status.Behind),
-		status.Timestamp.Format(time.RFC3339),
+		relative,
 		"(PR: pending)",
 	)
 }

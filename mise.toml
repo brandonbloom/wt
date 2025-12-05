@@ -1,0 +1,10 @@
+[env]
+_.path = "{{ cwd }}/bin"
+GOCACHE = "{{ cwd }}/.gocache"
+GOMODCACHE = "{{ cwd }}/.gopath"
+
+[tasks.build]
+run = "go build -o bin/ ./cmd/wt "
+
+[tasks.test]
+run = "go test ./..."

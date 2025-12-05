@@ -34,6 +34,7 @@
   - `default_branch = "main"` (string) which must match the default branch reported by GitHub for the repository.
   - `[bootstrap]` section with a single `run = "..."` field whose contents are executed in the user’s default shell (`$SHELL`) immediately after `wt new` creates and enters a worktree. The command runs synchronously and inherits stdin/stdout/stderr; failures abort the `wt new` flow with a clear message.
 - The README must document the configuration file, the `default_branch` field, and the `[bootstrap]` section semantics so that users can edit it without referring to the source.
+- A dedicated `wt bootstrap` command reruns the configured bootstrap script within the current worktree, allowing users to reset dependencies or rerun setup later.
 
 ## Worktree Naming (`wt new`)
 - `wt new` creates a new git worktree rooted in the current project.
@@ -48,20 +49,21 @@
 
 ## Shell Integration (`wt activate`)
 - Because a binary cannot directly change the caller’s `cwd`, the installed Go binary is named `wt` and emits shell code that defines a shell wrapper function (also named `wt`) which shadows the binary on `$PATH`.
-- When the shell wrapper is not installed, running the binary directly should detect the condition and provide installation guidance rather than failing silently.
+- Commands that need to `cd` (e.g., `wt new`) should fail politely when the wrapper is missing, but `wt`/`wt status` must proactively detect an inactive wrapper and emit installation guidance before rendering the dashboard.
 - `wt activate` is responsible for emitting the shell script that installs/updates the wrapper function. Users add `eval "$(wt activate)"` to their shell rc (zsh assumed, but solution should be shell-agnostic where possible).
 - Installation flow: `go install github.com/brandonbloom/wt/cmd/wt@latest`, then add the eval line to shell config.
 - Goal: allow commands like `wt new` to create a worktree and automatically `cd` into it through the evaluated shell function.
 
 ## Status Dashboard (`wt`)
 - Running `wt` with no subcommand prints a dashboard view of all worktrees, rendered as exactly one status line per worktree (current worktree line should include an additional marker/prefix to highlight it).
+- Before hitting git, `wt status` should perform lightweight “doctor-lite” checks (wrapper active, `.wt` discoverable, default worktree healthy) and surface any failures inline so users fix issues before reading stale data.
 - Required data per worktree:
   - Git details (branch name, ahead/behind vs upstream, dirty state).
 - Timestamp derived as: newest file mtime when the worktree is dirty or has staged changes; otherwise use the HEAD commit timestamp. Display the timestamp as a friendly relative string (e.g., `3s ago`, `2 min ago`, `yesterday 2pm`, `4 days ago`) instead of raw ISO text.
   - If the branch has an associated GitHub pull request, display its status.
 - When run inside a specific worktree, highlight that worktree with additional detail while still summarizing the others.
 - Output should respect the “silence is golden” philosophy where possible (e.g., avoid gratuitous chatter when nothing noteworthy changed).
-- Performance expectations: local info renders essentially instantly, even with dozens or a few hundred worktrees; remote/GitHub data may stream in afterward, showing placeholders such as “pending…” and respecting Ctrl+C to abort remote fetches. Bonus idea: when attached to an interactive TTY, dynamically update remote sections; when piping to scripts, emit a single pass suitable for parsing.
+- Performance expectations: local info renders essentially instantly, even with dozens or a few hundred worktrees; remote/GitHub data may stream in afterward, showing placeholders such as “pending…” and respecting Ctrl+C to abort remote fetches. When attached to an interactive TTY, stream GitHub fetches using [`git@github.com:jedib0t/go-pretty.git`](https://github.com/jedib0t/go-pretty) progress widgets (indeterminate bars/spinners). When stdout is not a TTY, emit a single non-interactive pass suitable for scripts.
 
 ## `wt doctor`
 - Purpose: verify the environment and installation so that all `wt` functionality will succeed (shell wrapper installed, directory layout valid, git state sane, etc.).

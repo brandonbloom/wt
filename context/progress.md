@@ -28,6 +28,7 @@ This file tracks every requirement from `context/spec.md`. Update the checkboxes
 - [x] Resides at `<project>/.wt/config.toml`, outside the repo.
 - [x] Stores `default_branch` and `[bootstrap].run` values, validated on load.
 - [x] README documents the config file, `default_branch`, and `[bootstrap]` semantics.
+- [ ] `wt bootstrap` reruns the configured bootstrap script inside the current worktree.
 
 ## Worktree Naming (`wt new`)
 - [x] Generates short, distinct, inoffensive adjective–noun names when none are provided.
@@ -40,13 +41,15 @@ This file tracks every requirement from `context/spec.md`. Update the checkboxes
 ## Shell Integration (`wt activate`)
 - [x] `wt activate` emits the shell script that installs/updates the wrapper function.
 - [x] Wrapper shadows the binary, exports markers for directory change instructions, and can be reinstalled via `eval "$(wt activate)"`.
-- [ ] Running the binary directly without the wrapper should detect the condition and guide the user.
+- [ ] `wt status` proactively detects a missing wrapper and guides the user before rendering output.
 
 ## Status Dashboard (`wt`)
 - [x] Prints exactly one status line per worktree with a marker for the current worktree.
 - [x] Displays branch name, ahead/behind counts, and dirty state indicators.
 - [x] Uses newest dirty/staged file mtime when dirty, else HEAD commit timestamp, and renders the value as a friendly relative string (e.g., `3s ago`, `2 min ago`, `yesterday 2pm`, `4 days ago`).
+- [ ] Runs lightweight doctor checks (wrapper active, `.wt` present, default worktree healthy) before collecting git status.
 - [ ] Shows GitHub PR status for associated branches, fetching via `gh pr list`, with streaming placeholders (`pending…`) and Ctrl+C-friendly behavior.
+- [ ] Streams GitHub fetch progress with go-pretty widgets when attached to a TTY and degrades to single-pass output when redirected.
 - [ ] Prefers silence when nothing noteworthy changed but surfaces actionable info when it does.
 
 ## `wt doctor`

@@ -96,6 +96,12 @@ func resolveDefaultWorktree(root string) (string, string, error) {
 	}
 }
 
+// DetectDefaultWorktree reports which default worktree directory (main/master)
+// exists under root, along with its absolute path, even when .wt is missing.
+func DetectDefaultWorktree(root string) (string, string, error) {
+	return resolveDefaultWorktree(root)
+}
+
 func isDir(path string) bool {
 	fi, err := os.Stat(path)
 	if err != nil {

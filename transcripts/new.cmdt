@@ -1,4 +1,4 @@
-$ rm -rf tmprepo
+$ ./scripts/cleanup.sh tmprepo
 $ mkdir tmprepo
 $ cd tmprepo
 $ export GIT_AUTHOR_NAME=wt-test
@@ -18,4 +18,4 @@ $ ../../bin/wt new demo-branch --base main
 1 HEAD is now at 79cb6b2 init
 1 Created demo-branch at /Users/bbloom/Projects/wt/tmprepo/demo-branch (run `cd /Users/bbloom/Projects/wt/tmprepo/demo-branch`)
 $ cd ../..
-$ rm -rf tmprepo
+$ ./scripts/cleanup.sh tmprepo

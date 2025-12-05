@@ -16,6 +16,8 @@ This directory contains [transcript](https://github.com/deref/transcript) fixtur
    go tool github.com/deref/transcript check transcripts/*.cmdt
    ```
 
+Use `scripts/cleanup.sh tmprepo` (or another relative path) to drop temporary repos without tripping sandbox approvals.
+
 The `context/transcript.md` guide in this repository dives deeper into the format if you need a refresher.
 
 ## Test Harness

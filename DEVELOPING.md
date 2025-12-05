@@ -5,6 +5,7 @@
 - Read `context/spec.md` and keep `context/progress.md` up to date.
 - The agent playbook lives in `AGENTS.md`; read it before automating changes.
 - User-facing CLI behavior should be covered by transcript fixtures in `transcripts/`.
+- Reset throwaway repos with `scripts/cleanup.sh <relative-path>` instead of direct `rm -rf`.
 
 ## Building & Testing
 

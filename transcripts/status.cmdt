@@ -1,4 +1,4 @@
-$ rm -rf tmprepo
+$ ./scripts/cleanup.sh tmprepo
 $ mkdir tmprepo
 $ cd tmprepo
 $ export GIT_AUTHOR_NAME=wt-test
@@ -20,4 +20,4 @@ $ ../../bin/wt
 1 * demo-branch  demo-branch ↑0 ↓0    2 days ago (PR: pending)
 1   main         main ↑0 ↓0           2 days ago (PR: pending)
 $ cd ../..
-$ rm -rf tmprepo
+$ ./scripts/cleanup.sh tmprepo

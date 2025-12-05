@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -29,6 +30,12 @@ func runInit(cmd *cobra.Command, args []string) error {
 }
 
 func initializeInDirectory(cmd *cobra.Command, dir string) error {
+	if handled, err := tryInitializeExistingLayout(cmd, dir); err != nil {
+		return err
+	} else if handled {
+		return nil
+	}
+
 	repoRoot, err := gitutil.Run(dir, "rev-parse", "--show-toplevel")
 	if err != nil {
 		return fmt.Errorf("determine git root: %w", err)
@@ -41,11 +48,7 @@ func initializeInDirectory(cmd *cobra.Command, dir string) error {
 
 	parent := filepath.Dir(repoRoot)
 	if looksConverted(parent) {
-		if _, err := project.EnsureConfig(parent, branch); err != nil {
-			return err
-		}
-		fmt.Fprintf(cmd.OutOrStdout(), "wt already initialized at %s\n", parent)
-		return nil
+		return finalizeExistingLayout(cmd, parent, branch)
 	}
 
 	if branch != "main" && branch != "master" {
@@ -67,6 +70,43 @@ func initializeInDirectory(cmd *cobra.Command, dir string) error {
 		fmt.Fprintf(cmd.OutOrStdout(), "Please cd into %s\n", target)
 	}
 	return nil
+}
+
+func tryInitializeExistingLayout(cmd *cobra.Command, dir string) (bool, error) {
+	defaultBranch, _, err := project.DetectDefaultWorktree(dir)
+	if err != nil {
+		if errors.Is(err, project.ErrDefaultWorktreeMissing) {
+			return false, nil
+		}
+		return false, err
+	}
+	if err := finalizeExistingLayout(cmd, dir, defaultBranch); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func finalizeExistingLayout(cmd *cobra.Command, root, defaultBranch string) error {
+	configExisted := wtConfigExists(root)
+	if _, err := project.EnsureConfig(root, defaultBranch); err != nil {
+		return err
+	}
+	if configExisted {
+		fmt.Fprintf(cmd.OutOrStdout(), "wt already initialized at %s\n", root)
+		return nil
+	}
+
+	fmt.Fprintf(cmd.OutOrStdout(), "Initialized wt metadata at %s\n", root)
+	target := filepath.Join(root, defaultBranch)
+	if err := shellbridge.ChangeDirectory(target); err != nil {
+		fmt.Fprintf(cmd.OutOrStdout(), "Please cd into %s\n", target)
+	}
+	return nil
+}
+
+func wtConfigExists(root string) bool {
+	_, err := os.Stat(filepath.Join(root, ".wt", "config.toml"))
+	return err == nil
 }
 
 func looksConverted(dir string) bool {

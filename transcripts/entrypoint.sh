@@ -64,18 +64,19 @@ if [[ $# -eq 0 ]]; then
 fi
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-tmprepo="${repo_root}/tmprepo"
+tmprepo_rel="tmprepo"
+tmprepo="${repo_root}/${tmprepo_rel}"
 
 cleanup() {
   if [[ $keep_repo -eq 1 ]]; then
     echo "temp repo kept at ${tmprepo}" >&2
     return
   fi
-  rm -rf "${tmprepo}"
+  "${repo_root}/scripts/cleanup.sh" "${tmprepo_rel}"
 }
 trap cleanup EXIT
 
-rm -rf "${tmprepo}"
+"${repo_root}/scripts/cleanup.sh" "${tmprepo_rel}"
 mkdir -p "${tmprepo}"
 cd "${tmprepo}"
 

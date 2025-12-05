@@ -33,7 +33,6 @@ Project-specific settings live in `<project>/.wt/config.toml` next to the worktr
 ```
 /your/projects/
 ├── .wt/             # local configuration & management state
-│   └── config.toml
 ├── main/            # required default worktree (or `master`)
 ├── feature-x/       # examples of worktrees
 └── demo-branch/

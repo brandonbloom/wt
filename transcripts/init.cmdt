@@ -1,4 +1,4 @@
-$ rm -rf tmprepo
+$ ./scripts/cleanup.sh tmprepo
 $ mkdir tmprepo
 $ cd tmprepo
 $ git init -b main >/dev/null
@@ -8,5 +8,9 @@ $ git commit -m init >/dev/null
 $ ../bin/wt init
 1 Converted repository to wt layout at /Users/bbloom/Projects/wt/tmprepo
 1 Please cd into /Users/bbloom/Projects/wt/tmprepo/main
+$ rm -rf .wt
+$ ../bin/wt init
+1 Initialized wt metadata at /Users/bbloom/Projects/wt/tmprepo
+1 Please cd into /Users/bbloom/Projects/wt/tmprepo/main
 $ cd ..
-$ rm -rf tmprepo
+$ ./scripts/cleanup.sh tmprepo

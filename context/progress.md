@@ -4,7 +4,6 @@ This file tracks every requirement from `context/spec.md`. Update the checkboxes
 
 ## Project Overview
 - [x] CLI entrypoint is `wt` using Cobra, with the root command printing the status dashboard when no subcommand is provided.
-- [ ] Binary detects when the shell wrapper is missing and emits installation guidance.
 - [x] Logging/output avoids timestamped loggers (plain stdout/stderr messaging only).
 
 ## Directory & Worktree Assumptions
@@ -28,7 +27,7 @@ This file tracks every requirement from `context/spec.md`. Update the checkboxes
 - [x] Resides at `<project>/.wt/config.toml`, outside the repo.
 - [x] Stores `default_branch` and `[bootstrap].run` values, validated on load.
 - [x] README documents the config file, `default_branch`, and `[bootstrap]` semantics.
-- [ ] `wt bootstrap` reruns the configured bootstrap script inside the current worktree.
+- [ ] `wt bootstrap` reruns the configured bootstrap script inside the current worktree. *(next up)*
 
 ## Worktree Naming (`wt new`)
 - [x] Generates short, distinct, inoffensive adjective–noun names when none are provided.
@@ -46,9 +45,8 @@ This file tracks every requirement from `context/spec.md`. Update the checkboxes
 ## Status Dashboard (`wt`)
 - [x] Prints exactly one status line per worktree with a marker for the current worktree.
 - [x] Displays branch name, ahead/behind counts, and dirty state indicators.
-- [ ] Also badges divergence from the default branch using `[+N -M]` when applicable.
+- [x] Also badges divergence from the default branch using `[+N -M]` when applicable.
 - [x] Uses newest dirty/staged file mtime when dirty, else HEAD commit timestamp, and renders the value as a friendly relative string (e.g., `3s ago`, `2 min ago`, `yesterday 2pm`, `4 days ago`).
-- [ ] Runs lightweight doctor checks (wrapper active, `.wt` present, default worktree healthy) before collecting git status.
 - [x] Shows GitHub PR status for associated branches, fetching via `gh pr list`, with streaming placeholders (`pending…`) and Ctrl+C-friendly behavior.
 - [x] Streams GitHub fetch progress by re-rendering the status table when attached to a TTY and degrades to single-pass output when redirected.
 - [ ] Prefers silence when nothing noteworthy changed but surfaces actionable info when it does.
@@ -65,12 +63,15 @@ This file tracks every requirement from `context/spec.md`. Update the checkboxes
 - [x] All GitHub data flows through the `gh` CLI (PR discovery, repo metadata).
 - [x] Associates worktrees/branches with PRs via `gh pr list --head <branch>` (with fallbacks) and handles multiple/zero matches explicitly.
 
-## Error Handling
-- [ ] All commands emit actionable, early error messages and stop before causing damage.
-- [ ] `wt doctor` proactively checks for conditions that would otherwise cause command failures.
+## Error Handling / Audit Remediation
+- [ ] Post-audit remediation bundle covering multiple sections:
+  - Binary detects when the shell wrapper is missing and emits installation guidance (Project Overview).
+  - `wt status` runs lightweight doctor checks (wrapper active, `.wt` present, default worktree healthy) before collecting git status.
+  - All commands emit actionable, early error messages and stop before causing damage.
+  - `wt doctor` proactively checks for conditions that would otherwise cause command failures.
 
 ## Methodology & Testing
 - [ ] Follow strict TDD with failing tests first (unit or transcript) before implementing behavior.
-- [ ] Use `git@github.com:brandonbloom/wt-playground.git` when exercising real worktree flows.
+- [ ] Use `git@github.com:brandonbloom/wt-playground.git` when exercising real worktree flows (current transcripts spin up a local stub repo via `transcripts/entrypoint.sh`).
 - [x] Cover user-facing CLI behavior with transcript `.cmdt` fixtures and keep them updated via `transcript update`.
 - [x] Ensure transcript fixtures live under `transcripts/` and remain version-controlled.

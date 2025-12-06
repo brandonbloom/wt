@@ -69,6 +69,46 @@
   - Upstream divergence (relative to the branch’s configured upstream, or inferred equivalent) stays as the existing `↑N`/`↓M` markers.
   - Divergence from the configured default branch (e.g., `origin/main`) is shown inline via a short badge appended to the branch column, e.g., `[+5 -2]` when the worktree is five commits ahead and two commits behind the default branch. Omit the badge entirely when both counts are zero.
 
+## Worktree Cleanup (`wt tidy`)
+- Purpose: prune finished or abandoned worktrees/branches so the project root stays manageable without losing work.
+- Safety classification:
+  - **Safe** candidates satisfy the “nothing of value will be lost” rule: the worktree has no staged/unstaged changes, no stash entries, its HEAD (and therefore every unique commit) is already reachable from the configured default branch, `git status` is clean, and at most one GitHub pull request targets the branch. If an open PR exists but the commits already landed on the default branch, `wt tidy` treats it as safe and closes the PR as part of cleanup.
+  - **Gray** candidates carry some ambiguity (e.g., commits not merged yet, a lone PR that has stalled, last activity older than the stale threshold, or divergence beyond the configured limit) but still have a clean worktree/stash so the user can explicitly discard them.
+  - **Blocked** candidates have local state that would definitely cause data loss (untracked/staged changes, stash entries, other worktrees pointing at the same branch, or multiple PRs for the same head); `wt tidy` refuses to touch them and prints guidance to resolve the blockers manually.
+- Cleanup actions for safe or approved gray candidates happen in one transaction per worktree:
+  - Emit a short recap of the branch/worktree slated for deletion.
+  - Delete the worktree directory.
+  - Delete the corresponding local branch (after confirming no other worktree references it).
+  - Delete the remote branch (default `origin`) once HEAD parity is confirmed to avoid nuking rewritten history.
+  - Close the associated PR via `gh pr close --comment "...tidy..."`. This runs even for open PRs whose commits already landed in the default branch so dangling references disappear.
+  - Prune the remote (`git remote prune origin`) once at the end of the command to remove stale refs.
+- CLI ergonomics:
+  - `wt tidy` defaults to scanning every non-default worktree. Flags include:
+    - `-n, --dry-run`: never mutate anything; instead print “Will clean up:” followed by the per-worktree actions and “Will prompt for:” entries for gray candidates.
+    - `--policy=<safe|all|prompt>` where `safe` is the default. `safe` auto-cleans safe candidates and prompts for gray; `prompt` prompts even for safe ones; `all` auto-cleans both categories.
+    - Convenience aliases: `--safe`/`-s`, `--all`/`-a`, and `--prompt` map to their respective policy values.
+    - `--assume-no` (long-only) suppresses interactive prompts by automatically rejecting gray candidates; combine with `--policy=safe` to make the command non-interactive while still touching safe worktrees.
+  - Prompts render a “mini status panel” for each gray candidate before requesting confirmation. The panel lists PR status, ahead/behind/divergence vs the default branch, last activity timestamp (max of HEAD commit time, PR update time, or worktree mtime), local dirty status, and whether a stash exists.
+  - While prompting, `y` proceeds with cleanup, `n` skips, and Ctrl+C aborts the entire run. `--assume-no` turns every prompt into an implicit “n” so automation can safely skip gray areas.
+  - Output must match the status dashboard ergonomics: when stdout is an interactive TTY, render a live table that updates as data (git + GitHub) streams in, reusing the same column layout/renderer used by `wt status`; when stdout is not a TTY, emit a single non-interactive log with grouped sections (“Will clean up/Will prompt/Will skip”) plus progress updates for each worktree as it finishes.
+  - Remote/GitHub fetches (PR metadata, other network calls) should kick off in parallel so the UI updates incrementally instead of blocking on each branch sequentially.
+- Gray classification heuristics (all configurable):
+  - A branch whose last activity is older than 14 days (default) is considered stale. The counter uses the same timestamp as the prompt panel.
+  - More than 20 commits of divergence (ahead or behind) relative to the default branch marks the branch as gray even if it is otherwise clean, since the drift suggests abandonment.
+  - Any open PR whose commits have not yet merged into the default branch is gray; `wt tidy` highlights the PR URL/status so the user can make the call.
+  - Any branch with multiple PRs (reopened or duplicate heads) is gray because we cannot automatically determine which to close.
+- Configuration:
+  - `.wt/config.toml` grows a `[tidy]` section with the following keys (all optional):
+    - `policy = "safe"` sets the default policy (`safe`, `all`, or `prompt`).
+    - `stale_days = 14` controls the inactivity threshold in days.
+    - `divergence_commits = 20` controls how many commits of ahead/behind drift marks a branch as gray.
+  - Future knobs (e.g., remote name) should also live under `[tidy]`.
+- Error handling & UX:
+  - Refuse to run if `gh` is unavailable, since PR inspection/closure is mandatory for the feature.
+  - When skipping a worktree (blocked or rejected prompt), explain why so the user can fix or rerun.
+  - The README “Everyday Usage” section should mention `wt tidy` with only the high-traffic flags (`--dry-run`, `--safe`, `--all`), while the detailed config and prompt behaviors belong in `DEVELOPING.md` or a dedicated docs section.
+  - Cover the new command with transcript fixtures that demonstrate safe cleanup, gray prompting, dry-run output, and blocked cases.
+
 ## `wt doctor`
 - Purpose: verify the environment and installation so that all `wt` functionality will succeed (shell wrapper installed, directory layout valid, git state sane, etc.).
 - Checks must confirm required tooling is installed and usable, including git and the GitHub CLI (`gh`), that `gh` is authenticated and can reach GitHub, that the expected project directory layout is present (including a `.wt` directory discovered via the upward walk), that the configured `default_branch` matches GitHub’s default, and that the shell wrapper is installed.

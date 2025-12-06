@@ -16,6 +16,6 @@ $ cd main
 $ ../../bin/wt new demo-branch --base main
 2 Preparing worktree (new branch 'demo-branch')
 1 HEAD is now at 79cb6b2 init
-1 Created demo-branch at /Users/bbloom/Projects/wt/tmprepo/demo-branch (run `cd /Users/bbloom/Projects/wt/tmprepo/demo-branch`)
+1 Created demo-branch at /Users/bbloom/Projects/wt/main/tmprepo/demo-branch (run `cd /Users/bbloom/Projects/wt/main/tmprepo/demo-branch`)
 $ cd ../..
 $ ./scripts/cleanup.sh tmprepo

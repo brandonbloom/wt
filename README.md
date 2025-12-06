@@ -23,6 +23,7 @@ The `activate` step installs the shell wrapper so subcommands (e.g., `wt new`) c
 - `wt new [name] [--base=<branch>]` – create a new branch/worktree (names default to curated adjective–noun pairs). After creation the wrapper `cd`s into the new tree and runs the configured bootstrap command.
 - `wt bootstrap` – rerun the configured bootstrap script in the current worktree.
 - `wt` / `wt status` – dashboard with one line per worktree showing branch state, relative “time ago” updates, and PR placeholders.
+- `wt tidy [--dry-run] [--safe|--all]` – prune worktrees/branches that are already merged or obviously abandoned (`--safe` auto-cleans only the guaranteed-safe set, `--all` auto-approves everything; omit both to review the gray areas interactively).
 - `wt doctor [--verbose]` – verify git/gh installations, layout, config, and wrapper state.
 
 Project-specific settings live in `<project>/.wt/config.toml` next to the worktrees so you can tune the default branch and bootstrap commands without touching the git repo.
@@ -58,11 +59,17 @@ default_branch = "main"
 [bootstrap]
 run = "mise run deps"
 # strict = false
+
+[tidy]
+# policy = "safe"          # also accepts "all" or "prompt"
+# stale_days = 14
+# divergence_commits = 20
 ```
 
 - `default_branch` must match GitHub’s default for the repo; `wt doctor` verifies this via `gh`.
 - `[bootstrap].run` executes in your shell immediately after `wt new` creates a worktree (and whenever you run `wt bootstrap`). Failures abort the command so you can fix dependencies before continuing.
 - `[bootstrap].strict` defaults to `true` (the template omits it). When enabled, the bootstrap script runs with `set -euo pipefail`; set it to `false` if you need lenient shell behavior.
+- `[tidy]` customizes `wt tidy`: `policy` controls the default behavior (`safe` auto-cleans only merged branches, `all` skips prompts, `prompt` asks even for safe candidates), while `stale_days` and `divergence_commits` tune when a clean branch is considered “gray” and requires a decision.
 - Because `.wt/` is not in git, teammates can customize their bootstrap commands or defaults without conflicts.
 
 ## Docs & License

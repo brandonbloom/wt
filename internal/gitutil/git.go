@@ -43,6 +43,24 @@ func Dirty(dir string) (bool, error) {
 	return strings.TrimSpace(out) != "", nil
 }
 
+// HasBranchStash reports whether any stash entries mention the given branch.
+func HasBranchStash(dir, branch string) (bool, error) {
+	out, err := Run(dir, "stash", "list")
+	if err != nil {
+		return false, err
+	}
+	if strings.TrimSpace(out) == "" || branch == "" {
+		return false, nil
+	}
+	pattern := fmt.Sprintf("on %s:", branch)
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, pattern) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // AheadBehind counts commits relative to upstream. Missing upstream yields zeros.
 func AheadBehind(dir, branch string) (ahead, behind int, err error) {
 	if ahead, behind, ok, err := aheadBehindFromStatus(dir); err == nil && ok {
@@ -120,6 +138,22 @@ func LatestDirtyTimestamp(dir string) (time.Time, error) {
 		return time.Time{}, errors.New("unable to find dirty files")
 	}
 	return newest, nil
+}
+
+// HeadMergedInto reports whether HEAD is already an ancestor of the given ref.
+func HeadMergedInto(dir, ref string) (bool, error) {
+	if ref == "" {
+		return false, nil
+	}
+	cmd := exec.Command("git", "-C", dir, "merge-base", "--is-ancestor", "HEAD", ref)
+	if err := cmd.Run(); err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 // WorktreeOperation inspects git metadata to determine if a high-level operation is in progress.
@@ -228,4 +262,20 @@ func aheadBehindAgainstRef(dir, ref string) (ahead, behind int, err error) {
 		return 0, 0, err
 	}
 	return ahead, behind, nil
+}
+
+// RemoteBranchHead reports the current commit for remote/branch if it exists.
+func RemoteBranchHead(dir, remote, branch string) (string, bool, error) {
+	if remote == "" || branch == "" {
+		return "", false, nil
+	}
+	ref := fmt.Sprintf("refs/remotes/%s/%s", remote, branch)
+	if !gitRefExists(dir, ref) {
+		return "", false, nil
+	}
+	out, err := Run(dir, "rev-parse", ref)
+	if err != nil {
+		return "", false, err
+	}
+	return strings.TrimSpace(out), true, nil
 }

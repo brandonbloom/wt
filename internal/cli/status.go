@@ -10,8 +10,8 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -120,6 +120,7 @@ type worktreeStatus struct {
 	Current    bool
 	PRStatus   string
 	Operation  string
+	NeedsInput bool
 }
 
 func collectWorktreeStatus(wt project.Worktree, defaultBranch string) (*worktreeStatus, error) {
@@ -166,18 +167,32 @@ func collectWorktreeStatus(wt project.Worktree, defaultBranch string) (*worktree
 
 func terminalWidth(w io.Writer) (int, bool) {
 	f, ok := w.(*os.File)
-	if !ok {
-		return 0, false
+	if ok {
+		fd := int(f.Fd())
+		if term.IsTerminal(fd) {
+			width, _, err := term.GetSize(fd)
+			if err == nil && width > 0 {
+				return width, true
+			}
+			if envWidth := envTerminalWidth(); envWidth > 0 {
+				return envWidth, true
+			}
+			return 80, true
+		}
 	}
-	fd := int(f.Fd())
-	if !term.IsTerminal(fd) {
-		return 0, false
+	if envWidth := envTerminalWidth(); envWidth > 0 {
+		return envWidth, false
 	}
-	width, _, err := term.GetSize(fd)
-	if err != nil || width <= 0 {
-		return 80, true
+	return 0, false
+}
+
+func envTerminalWidth() int {
+	if cols, ok := os.LookupEnv("COLUMNS"); ok {
+		if v, err := strconv.Atoi(cols); err == nil && v > 0 {
+			return v
+		}
 	}
-	return width, true
+	return 0
 }
 
 const columnGap = "   "
@@ -235,6 +250,11 @@ func buildColumnLayout(statuses []*worktreeStatus, now time.Time, maxWidth int) 
 	}
 	if maxWidth > 0 {
 		widths = shrinkWidths(widths, maxWidth)
+		layout := columnLayout{widths: widths}
+		total := layout.totalWidth()
+		if total < maxWidth {
+			widths[len(widths)-1] += maxWidth - total
+		}
 	}
 	return columnLayout{widths: widths}
 }
@@ -400,6 +420,13 @@ func (r *statusRenderer) Render(statuses []*worktreeStatus, layout columnLayout,
 	r.lines = len(lines)
 }
 
+func (r *statusRenderer) AddExtraLines(n int) {
+	if r == nil || n <= 0 {
+		return
+	}
+	r.lines += n
+}
+
 func colorizeParts(parts []string, status *worktreeStatus) {
 	if status.Current {
 		parts[0] = colorNameCurrent(parts[0])
@@ -419,11 +446,14 @@ func colorizeParts(parts []string, status *worktreeStatus) {
 	parts[1] = branchColor(parts[1])
 
 	parts[2] = colorTimeValue(parts[2])
-	parts[3] = choosePRColor(status.PRStatus)(parts[3])
+	parts[3] = choosePRColor(status)(parts[3])
 }
 
-func choosePRColor(pr string) func(a ...interface{}) string {
-	pr = strings.ToLower(pr)
+func choosePRColor(status *worktreeStatus) func(a ...interface{}) string {
+	if status.NeedsInput {
+		return color.New(color.FgHiRed).SprintFunc()
+	}
+	pr := strings.ToLower(status.PRStatus)
 	switch {
 	case strings.Contains(pr, "merged"):
 		return colorPRMerged
@@ -565,23 +595,6 @@ func queryPullRequestStatus(ctx context.Context, dir, branch string) (string, er
 		}
 		return fmt.Sprintf("(PR %s multiple)", strings.Join(nums, ", ")), nil
 	}
-}
-
-func isWithin(child, parent string) bool {
-	rel, err := filepath.Rel(parent, child)
-	if err != nil {
-		return false
-	}
-	return rel == "." || !strings.HasPrefix(rel, "..")
-}
-
-func currentTimeOverride() time.Time {
-	if override := os.Getenv("WT_NOW"); override != "" {
-		if t, err := time.Parse(time.RFC3339, override); err == nil {
-			return t
-		}
-	}
-	return time.Now()
 }
 
 func statusPreflight(cmd *cobra.Command) {

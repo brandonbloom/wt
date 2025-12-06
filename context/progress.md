@@ -51,6 +51,15 @@ This file tracks every requirement from `context/spec.md`. Update the checkboxes
 - [x] Streams GitHub fetch progress by re-rendering the status table when attached to a TTY and degrades to single-pass output when redirected.
 - [ ] Prefers silence when nothing noteworthy changed but surfaces actionable info when it does.
 
+## Worktree Cleanup (`wt tidy`)
+- [x] Classifies each non-default worktree as safe, gray, or blocked using cleanliness, PR state, stale-days, and divergence thresholds.
+- [x] Honors `--policy=<safe|all|prompt>` with aliases (`--safe/-s`, `--all/-a`, `--prompt`), supports long-only `--assume-no`, and reports planned actions under “Will clean up:” / “Will prompt for:” in `-n/--dry-run`.
+- [x] Shows a mini status panel (PR status, divergence, last activity, dirty/stash indicators) before each prompt and respects `--assume-no` for automation.
+- [x] Runs the full cleanup transaction (worktree dir, local branch, remote branch, PR closure, remote prune) only after confirming no other worktree references the branch.
+- [x] Skips or blocks worktrees with local changes or stash entries and prints actionable guidance.
+- [x] Reads defaults from the `[tidy]` config section (`policy`, `stale_days`, `divergence_commits`) and documents the new knobs.
+- [x] Mirrors the status dashboard UX: live table with streaming updates on TTYs, single-pass grouped output otherwise, and parallel GitHub fetches so branches update concurrently.
+
 ## `wt doctor`
 - [x] Verifies git, GitHub CLI, and other required tooling are installed and usable.
 - [x] Confirms `gh` is authenticated and can reach GitHub.

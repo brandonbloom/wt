@@ -91,16 +91,97 @@ git init -b main >/dev/null
 echo hi >README.md
 git add README.md
 git commit -m init >/dev/null
+gh_state_file="${tmprepo}/.gh-prs"
 
 if [[ $run_init -eq 1 ]]; then
   "${repo_root}/bin/wt" init >/dev/null
   cd "${tmprepo}"
 fi
 
+cat >"${gh_state_file}" <<'EOF'
+demo-branch|42|OPEN|false|2000-01-02T00:00:00Z|https://example.com/pr/42
+EOF
+
 mkdir -p bin
 cat >bin/gh <<'EOF'
 #!/bin/sh
 set -eu
+
+STATE_FILE="${WT_GH_STATE_FILE:-${PWD}/.gh-prs}"
+
+pr_list() {
+  branch=""
+  limit=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --head)
+        branch="$2"
+        shift 2
+        ;;
+      --limit)
+        limit="$2"
+        shift 2
+        ;;
+      --state|--json)
+        shift 2
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+
+  echo '['
+  first=1
+  count=0
+  if [ -f "$STATE_FILE" ]; then
+    while IFS='|' read -r pr_branch pr_number pr_state pr_draft pr_updated pr_url; do
+      [ -z "$pr_branch" ] && continue
+      if [ -n "$branch" ] && [ "$branch" != "$pr_branch" ]; then
+        continue
+      fi
+      count=$((count + 1))
+      if [ "$limit" -gt 0 ] && [ "$count" -gt "$limit" ]; then
+        break
+      fi
+      if [ "$first" -eq 0 ]; then
+        printf ','
+      fi
+      first=0
+      printf '{"number":%s,"state":"%s","isDraft":%s,"updatedAt":"%s","url":"%s"}' \
+        "$pr_number" "$pr_state" "$pr_draft" "$pr_updated" "$pr_url"
+    done <"$STATE_FILE"
+  fi
+  echo ']'
+}
+
+pr_close() {
+  if [ "$#" -lt 1 ]; then
+    echo "gh stub: pr close requires a number" >&2
+    exit 1
+  fi
+  number="$1"
+  shift
+  found=0
+  tmp="$(mktemp "${STATE_FILE}.XXXXXX")"
+  if [ -f "$STATE_FILE" ]; then
+    while IFS='|' read -r pr_branch pr_number pr_state pr_draft pr_updated pr_url; do
+      [ -z "$pr_branch" ] && continue
+      if [ "$pr_number" = "$number" ] && [ "$found" -eq 0 ]; then
+        pr_state="CLOSED"
+        found=1
+      fi
+      echo "${pr_branch}|${pr_number}|${pr_state}|${pr_draft}|${pr_updated}|${pr_url}" >>"$tmp"
+    done <"$STATE_FILE"
+  fi
+  if [ "$found" -eq 0 ]; then
+    rm -f "$tmp"
+    echo "gh stub: pull request #${number} not found" >&2
+    exit 1
+  fi
+  mv "$tmp" "$STATE_FILE"
+  echo "Closed PR #${number}"
+}
 
 if [ "$#" -lt 1 ]; then
   echo "gh stub: missing subcommand" >&2
@@ -124,29 +205,16 @@ case "$sub" in
     ;;
   pr)
     if [ "${1:-}" = "list" ]; then
-      branch=""
-      while [ $# -gt 0 ]; do
-        case "$1" in
-          --head)
-            branch="$2"
-            shift 2
-            ;;
-          --json|--limit|--state)
-            shift 2
-            ;;
-          *)
-            shift
-            ;;
-        esac
-      done
+      shift
       if [ -n "${WT_TEST_GH_DELAY:-}" ]; then
         sleep "${WT_TEST_GH_DELAY}"
       fi
-      if [ "$branch" = "demo-branch" ]; then
-        printf '[{"number":42,"state":"OPEN","isDraft":false}]\n'
-      else
-        printf '[]\n'
-      fi
+      pr_list "$@"
+      exit 0
+    fi
+    if [ "${1:-}" = "close" ]; then
+      shift
+      pr_close "$@"
       exit 0
     fi
     ;;
@@ -157,6 +225,7 @@ exit 1
 EOF
 chmod +x bin/gh
 export PATH="${tmprepo}/bin:${PATH}"
+export WT_GH_STATE_FILE="${gh_state_file}"
 
 if [[ $activate_wrapper -eq 1 ]]; then
   export WT_WRAPPER_ACTIVE=1

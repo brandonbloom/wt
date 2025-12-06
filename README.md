@@ -21,6 +21,7 @@ The `activate` step installs the shell wrapper so subcommands (e.g., `wt new`) c
 - `wt clone <url>` – clone a repo and immediately convert it to the `<project>/<branch>` layout.
 - `wt init` – convert an existing repo in-place.
 - `wt new [name] [--base=<branch>]` – create a new branch/worktree (names default to curated adjective–noun pairs). After creation the wrapper `cd`s into the new tree and runs the configured bootstrap command.
+- `wt bootstrap` – rerun the configured bootstrap script in the current worktree.
 - `wt` / `wt status` – dashboard with one line per worktree showing branch state, relative “time ago” updates, and PR placeholders.
 - `wt doctor [--verbose]` – verify git/gh installations, layout, config, and wrapper state.
 
@@ -56,10 +57,12 @@ default_branch = "main"
 
 [bootstrap]
 run = "mise run deps"
+# strict = false
 ```
 
 - `default_branch` must match GitHub’s default for the repo; `wt doctor` verifies this via `gh`.
-- `[bootstrap].run` executes in your shell immediately after `wt new` creates a worktree. Failures abort the command so you can fix dependencies before continuing.
+- `[bootstrap].run` executes in your shell immediately after `wt new` creates a worktree (and whenever you run `wt bootstrap`). Failures abort the command so you can fix dependencies before continuing.
+- `[bootstrap].strict` defaults to `true` (the template omits it). When enabled, the bootstrap script runs with `set -euo pipefail`; set it to `false` if you need lenient shell behavior.
 - Because `.wt/` is not in git, teammates can customize their bootstrap commands or defaults without conflicts.
 
 ## Docs & License

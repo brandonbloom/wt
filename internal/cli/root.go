@@ -21,6 +21,7 @@ func newRootCommand() *cobra.Command {
 		newInitCommand(),
 		newCloneCommand(),
 		newNewCommand(),
+		newBootstrapCommand(),
 		newStatusCommand(),
 		newActivateCommand(),
 		newDoctorCommand(),

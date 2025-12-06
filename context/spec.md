@@ -32,9 +32,10 @@
 - Configuration lives at `<project>/.wt/config.toml` outside the repo so it need not be shared with collaborators.
 - File format: TOML. At minimum it contains:
   - `default_branch = "main"` (string) which must match the default branch reported by GitHub for the repository.
-  - `[bootstrap]` section with a single `run = "..."` field whose contents are executed in the user’s default shell (`$SHELL`) immediately after `wt new` creates and enters a worktree. The command runs synchronously and inherits stdin/stdout/stderr; failures abort the `wt new` flow with a clear message.
+  - `[bootstrap]` section with a `run = "..."` field whose contents are executed in the user’s default shell (`$SHELL`) immediately after `wt new` creates and enters a worktree. The command runs synchronously and inherits stdin/stdout/stderr; failures abort the `wt new` flow with a clear message.
+  - Optional `[bootstrap].strict = false` toggle; when omitted, bootstrap scripts execute under `set -euo pipefail` for safety. Setting `strict = false` reverts to lenient shell semantics.
 - The README must document the configuration file, the `default_branch` field, and the `[bootstrap]` section semantics so that users can edit it without referring to the source.
-- A dedicated `wt bootstrap` command reruns the configured bootstrap script within the current worktree, allowing users to reset dependencies or rerun setup later.
+- A dedicated `wt bootstrap` command reruns the configured bootstrap script within the current worktree, allowing users to reset dependencies or rerun setup later. It respects the `[bootstrap].strict` setting but also accepts `--strict`, `--no-strict`, and `-x/--xtrace` flags to temporarily override strict mode or enable shell tracing.
 
 ## Worktree Naming (`wt new`)
 - `wt new` creates a new git worktree rooted in the current project.

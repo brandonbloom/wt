@@ -18,7 +18,16 @@ type Config struct {
 
 // BootstrapBlock describes commands that run after creating a new worktree.
 type BootstrapBlock struct {
-	Run string `toml:"run"`
+	Run    string `toml:"run"`
+	Strict *bool  `toml:"strict"`
+}
+
+// StrictEnabled reports whether strict shell options should be enabled.
+func (b BootstrapBlock) StrictEnabled() bool {
+	if b.Strict == nil {
+		return true
+	}
+	return *b.Strict
 }
 
 var (

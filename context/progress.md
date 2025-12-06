@@ -27,7 +27,7 @@ This file tracks every requirement from `context/spec.md`. Update the checkboxes
 - [x] Resides at `<project>/.wt/config.toml`, outside the repo.
 - [x] Stores `default_branch` and `[bootstrap].run` values, validated on load.
 - [x] README documents the config file, `default_branch`, and `[bootstrap]` semantics.
-- [ ] `wt bootstrap` reruns the configured bootstrap script inside the current worktree. *(next up)*
+- [x] `wt bootstrap` reruns the configured bootstrap script inside the current worktree.
 
 ## Worktree Naming (`wt new`)
 - [x] Generates short, distinct, inoffensive adjective–noun names when none are provided.

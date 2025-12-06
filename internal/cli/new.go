@@ -73,7 +73,9 @@ func runNew(cmd *cobra.Command, opts *newOptions, args []string) error {
 		return err
 	}
 
-	if err := runBootstrap(cmd, proj.Config.Bootstrap.Run, targetPath); err != nil {
+	if err := runBootstrap(cmd, proj.Config.Bootstrap.Run, targetPath, bootstrapOptions{
+		strict: proj.Config.Bootstrap.StrictEnabled(),
+	}); err != nil {
 		return err
 	}
 
@@ -126,7 +128,12 @@ func addWorktree(cmd *cobra.Command, proj *project.Project, name, baseBranch, ta
 	return nil
 }
 
-func runBootstrap(cmd *cobra.Command, script, dir string) error {
+type bootstrapOptions struct {
+	strict bool
+	xtrace bool
+}
+
+func runBootstrap(cmd *cobra.Command, script, dir string, opts bootstrapOptions) error {
 	script = strings.TrimSpace(script)
 	if script == "" {
 		return nil
@@ -135,7 +142,20 @@ func runBootstrap(cmd *cobra.Command, script, dir string) error {
 	if sh == "" {
 		sh = "/bin/sh"
 	}
-	run := exec.Command(sh, "-c", script)
+	command := script
+	if opts.strict || opts.xtrace {
+		prelude := make([]string, 0, 3)
+		if opts.strict {
+			prelude = append(prelude, "set -euo pipefail")
+		}
+		if opts.xtrace {
+			prelude = append(prelude, "set -x")
+		}
+		prelude = append(prelude, script)
+		command = strings.Join(prelude, "\n")
+	}
+
+	run := exec.Command(sh, "-c", command)
 	run.Dir = dir
 	run.Stdout = cmd.OutOrStdout()
 	run.Stderr = cmd.ErrOrStderr()

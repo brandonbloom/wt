@@ -115,3 +115,34 @@ func LatestDirtyTimestamp(dir string) (time.Time, error) {
 	}
 	return newest, nil
 }
+
+// WorktreeOperation inspects git metadata to determine if a high-level operation is in progress.
+func WorktreeOperation(dir string) (string, error) {
+	gitDir, err := Run(dir, "rev-parse", "--git-dir")
+	if err != nil {
+		return "", err
+	}
+	if !filepath.IsAbs(gitDir) {
+		gitDir = filepath.Join(dir, gitDir)
+	}
+	checks := []struct {
+		state string
+		paths []string
+	}{
+		{state: "rebasing", paths: []string{"rebase-merge", "rebase-apply"}},
+		{state: "merging", paths: []string{"MERGE_HEAD"}},
+	}
+	for _, check := range checks {
+		for _, rel := range check.paths {
+			if exists(filepath.Join(gitDir, rel)) {
+				return check.state, nil
+			}
+		}
+	}
+	return "", nil
+}
+
+func exists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}

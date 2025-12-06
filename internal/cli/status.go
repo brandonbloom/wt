@@ -117,6 +117,7 @@ type worktreeStatus struct {
 	Timestamp time.Time
 	Current   bool
 	PRStatus  string
+	Operation string
 }
 
 func collectWorktreeStatus(wt project.Worktree) (*worktreeStatus, error) {
@@ -128,9 +129,13 @@ func collectWorktreeStatus(wt project.Worktree) (*worktreeStatus, error) {
 	if err != nil {
 		return nil, err
 	}
+	operation, _ := gitutil.WorktreeOperation(wt.Path)
 	ahead, behind, err := gitutil.AheadBehind(wt.Path)
 	if err != nil {
-		return nil, err
+		if operation == "" && !isDetachedHeadError(err) {
+			return nil, err
+		}
+		ahead, behind = 0, 0
 	}
 	ts, err := gitutil.HeadTimestamp(wt.Path)
 	if err != nil {
@@ -149,6 +154,7 @@ func collectWorktreeStatus(wt project.Worktree) (*worktreeStatus, error) {
 		Ahead:     ahead,
 		Behind:    behind,
 		Timestamp: ts,
+		Operation: operation,
 	}, nil
 }
 
@@ -186,6 +192,7 @@ var (
 	colorBranchDiverged = color.New(color.FgMagenta).SprintFunc()
 	colorBranchClean    = color.New(color.FgHiBlack).SprintFunc()
 	colorTimeValue      = color.New(color.FgHiBlack).SprintFunc()
+	colorOperation      = color.New(color.FgHiMagenta, color.Bold).SprintFunc()
 	colorPRPending      = color.New(color.FgMagenta).SprintFunc()
 	colorPRMerged       = color.New(color.FgGreen).SprintFunc()
 	colorPRNone         = color.New(color.FgBlack, color.Faint).SprintFunc()
@@ -259,6 +266,9 @@ func statusFields(status *worktreeStatus, now time.Time) [4]string {
 	branch := status.Branch
 	if status.Dirty {
 		branch += "!"
+	}
+	if status.Operation != "" {
+		branch = fmt.Sprintf("%s (%s)", branch, status.Operation)
 	}
 	if delta := formatDelta(status.Ahead, status.Behind); delta != "" {
 		if branch != "" {
@@ -371,6 +381,8 @@ func colorizeParts(parts []string, status *worktreeStatus) {
 
 	branchColor := colorBranchClean
 	switch {
+	case status.Operation != "":
+		branchColor = colorOperation
 	case status.Dirty:
 		branchColor = colorBranchDirty
 	case status.Ahead > 0 || status.Behind > 0:
@@ -551,4 +563,12 @@ func singleLineError(err error) string {
 	msg = strings.ReplaceAll(msg, "\r\n", "\n")
 	msg = strings.TrimSpace(msg)
 	return strings.ReplaceAll(msg, "\n", "; ")
+}
+
+func isDetachedHeadError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "does not point to a branch") || strings.Contains(msg, "You are not currently on a branch")
 }

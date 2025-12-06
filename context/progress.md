@@ -46,6 +46,7 @@ This file tracks every requirement from `context/spec.md`. Update the checkboxes
 ## Status Dashboard (`wt`)
 - [x] Prints exactly one status line per worktree with a marker for the current worktree.
 - [x] Displays branch name, ahead/behind counts, and dirty state indicators.
+- [ ] Also badges divergence from the default branch using `[+N -M]` when applicable.
 - [x] Uses newest dirty/staged file mtime when dirty, else HEAD commit timestamp, and renders the value as a friendly relative string (e.g., `3s ago`, `2 min ago`, `yesterday 2pm`, `4 days ago`).
 - [ ] Runs lightweight doctor checks (wrapper active, `.wt` present, default worktree healthy) before collecting git status.
 - [x] Shows GitHub PR status for associated branches, fetching via `gh pr list`, with streaming placeholders (`pending…`) and Ctrl+C-friendly behavior.

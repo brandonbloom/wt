@@ -54,7 +54,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	now := currentTimeOverride()
 	statuses := make([]*worktreeStatus, 0, len(worktrees))
 	for _, wt := range worktrees {
-		status, err := collectWorktreeStatus(wt)
+		status, err := collectWorktreeStatus(wt, proj.Config.DefaultBranch)
 		if err != nil {
 			fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s: %s\n", wt.Name, singleLineError(err))
 			continue
@@ -108,19 +108,21 @@ func runStatus(cmd *cobra.Command, args []string) error {
 }
 
 type worktreeStatus struct {
-	Name      string
-	Path      string
-	Branch    string
-	Dirty     bool
-	Ahead     int
-	Behind    int
-	Timestamp time.Time
-	Current   bool
-	PRStatus  string
-	Operation string
+	Name       string
+	Path       string
+	Branch     string
+	Dirty      bool
+	Ahead      int
+	Behind     int
+	BaseAhead  int
+	BaseBehind int
+	Timestamp  time.Time
+	Current    bool
+	PRStatus   string
+	Operation  string
 }
 
-func collectWorktreeStatus(wt project.Worktree) (*worktreeStatus, error) {
+func collectWorktreeStatus(wt project.Worktree, defaultBranch string) (*worktreeStatus, error) {
 	branch, err := gitutil.CurrentBranch(wt.Path)
 	if err != nil {
 		return nil, err
@@ -130,7 +132,7 @@ func collectWorktreeStatus(wt project.Worktree) (*worktreeStatus, error) {
 		return nil, err
 	}
 	operation, _ := gitutil.WorktreeOperation(wt.Path)
-	ahead, behind, err := gitutil.AheadBehind(wt.Path)
+	ahead, behind, err := gitutil.AheadBehind(wt.Path, branch)
 	if err != nil {
 		if operation == "" && !isDetachedHeadError(err) {
 			return nil, err
@@ -146,15 +148,19 @@ func collectWorktreeStatus(wt project.Worktree) (*worktreeStatus, error) {
 			ts = dirtyTS
 		}
 	}
+	baseAhead, baseBehind, _ := gitutil.AheadBehindDefaultBranch(wt.Path, defaultBranch)
+
 	return &worktreeStatus{
-		Name:      wt.Name,
-		Path:      wt.Path,
-		Branch:    branch,
-		Dirty:     dirty,
-		Ahead:     ahead,
-		Behind:    behind,
-		Timestamp: ts,
-		Operation: operation,
+		Name:       wt.Name,
+		Path:       wt.Path,
+		Branch:     branch,
+		Dirty:      dirty,
+		Ahead:      ahead,
+		Behind:     behind,
+		BaseAhead:  baseAhead,
+		BaseBehind: baseBehind,
+		Timestamp:  ts,
+		Operation:  operation,
 	}, nil
 }
 
@@ -177,7 +183,7 @@ func terminalWidth(w io.Writer) (int, bool) {
 const columnGap = "   "
 const columnGapWidth = len(columnGap)
 
-var columnMinWidths = [4]int{4, 12, 8, 12}
+var columnMinWidths = [4]int{4, 14, 8, 16}
 var shrinkPriority = []int{3, 1, 0, 2}
 
 type columnLayout struct {
@@ -276,6 +282,14 @@ func statusFields(status *worktreeStatus, now time.Time) [4]string {
 		}
 		branch += delta
 	}
+	if status.PRStatus != "" && strings.Contains(strings.ToLower(status.PRStatus), "merged") {
+		// merged branches are expected to lag main; suppress base badge
+	} else if base := formatBaseDelta(status.BaseAhead, status.BaseBehind); base != "" {
+		if branch != "" {
+			branch += " "
+		}
+		branch += base
+	}
 	relative := timefmt.Relative(status.Timestamp, now)
 	pr := status.PRStatus
 	if pr == "" {
@@ -298,6 +312,20 @@ func formatDelta(ahead, behind int) string {
 		parts = append(parts, fmt.Sprintf("↓%d", behind))
 	}
 	return strings.Join(parts, " ")
+}
+
+func formatBaseDelta(ahead, behind int) string {
+	if ahead == 0 && behind == 0 {
+		return ""
+	}
+	parts := make([]string, 0, 2)
+	if ahead > 0 {
+		parts = append(parts, fmt.Sprintf("+%d", ahead))
+	}
+	if behind > 0 {
+		parts = append(parts, fmt.Sprintf("-%d", behind))
+	}
+	return fmt.Sprintf("[%s]", strings.Join(parts, " "))
 }
 
 func padOrTrim(text string, width int) string {
@@ -397,14 +425,14 @@ func colorizeParts(parts []string, status *worktreeStatus) {
 func choosePRColor(pr string) func(a ...interface{}) string {
 	pr = strings.ToLower(pr)
 	switch {
-	case strings.Contains(pr, "unavailable") || strings.Contains(pr, "multiple"):
-		return colorPRError
 	case strings.Contains(pr, "merged"):
 		return colorPRMerged
-	case strings.Contains(pr, "pending"), strings.Contains(pr, "open"), strings.Contains(pr, "draft"):
+	case strings.Contains(pr, "open"), strings.Contains(pr, "draft"), strings.Contains(pr, "pending"):
 		return colorPRPending
 	case strings.Contains(pr, "none"):
 		return colorPRNone
+	case strings.Contains(pr, "unavailable") || strings.Contains(pr, "multiple"):
+		return colorPRError
 	default:
 		return colorPROther
 	}
@@ -525,9 +553,17 @@ func queryPullRequestStatus(ctx context.Context, dir, branch string) (string, er
 		if pr.IsDraft && state == "open" {
 			state = "draft"
 		}
-		return fmt.Sprintf("(PR: %s #%d)", state, pr.Number), nil
+		return fmt.Sprintf("(PR #%d %s)", pr.Number, state), nil
 	default:
-		return "(PR: multiple)", nil
+		// show the first two numbers to aid cleanup
+		nums := make([]string, 0, len(pulls))
+		for i, pr := range pulls {
+			if i >= 3 {
+				break
+			}
+			nums = append(nums, fmt.Sprintf("#%d", pr.Number))
+		}
+		return fmt.Sprintf("(PR %s multiple)", strings.Join(nums, ", ")), nil
 	}
 }
 

@@ -44,10 +44,16 @@ func Dirty(dir string) (bool, error) {
 }
 
 // AheadBehind counts commits relative to upstream. Missing upstream yields zeros.
-func AheadBehind(dir string) (ahead, behind int, err error) {
+func AheadBehind(dir, branch string) (ahead, behind int, err error) {
+	if ahead, behind, ok, err := aheadBehindFromStatus(dir); err == nil && ok {
+		return ahead, behind, nil
+	}
 	out, err := Run(dir, "rev-list", "--left-right", "--count", "@{u}...HEAD")
 	if err != nil {
 		if strings.Contains(err.Error(), "no upstream") {
+			if ahead, behind, ok, fbErr := aheadBehindFromRemote(dir, branch); fbErr == nil && ok {
+				return ahead, behind, nil
+			}
 			return 0, 0, nil
 		}
 		return 0, 0, err
@@ -145,4 +151,81 @@ func WorktreeOperation(dir string) (string, error) {
 func exists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+func gitRefExists(dir, ref string) bool {
+	cmd := exec.Command("git", "-C", dir, "show-ref", "--verify", "--quiet", ref)
+	return cmd.Run() == nil
+}
+
+func aheadBehindFromStatus(dir string) (ahead, behind int, ok bool, err error) {
+	out, err := Run(dir, "status", "--porcelain=2", "--branch")
+	if err != nil {
+		return 0, 0, false, err
+	}
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "# branch.ab") {
+			var plus, minus int
+			_, scanErr := fmt.Sscanf(line, "# branch.ab +%d -%d", &plus, &minus)
+			if scanErr != nil {
+				return 0, 0, false, scanErr
+			}
+			return plus, minus, true, nil
+		}
+	}
+	return 0, 0, false, nil
+}
+
+func aheadBehindFromRemote(dir, branch string) (ahead, behind int, ok bool, err error) {
+	if branch == "" {
+		return 0, 0, false, nil
+	}
+	remote, err := Run(dir, "config", "--get", fmt.Sprintf("branch.%s.remote", branch))
+	if err != nil || remote == "" {
+		remote = "origin"
+	}
+	remoteRef := fmt.Sprintf("%s/%s", remote, branch)
+	fullRef := fmt.Sprintf("refs/remotes/%s/%s", remote, branch)
+	if !gitRefExists(dir, fullRef) {
+		return 0, 0, false, nil
+	}
+	ahead, behind, err = aheadBehindAgainstRef(dir, remoteRef)
+	if err != nil {
+		return 0, 0, false, err
+	}
+	return ahead, behind, true, nil
+}
+
+// AheadBehindDefaultBranch compares HEAD to origin/<defaultBranch>.
+func AheadBehindDefaultBranch(dir, defaultBranch string) (ahead, behind int, err error) {
+	if defaultBranch == "" {
+		return 0, 0, nil
+	}
+	remote := "origin"
+	fullRef := fmt.Sprintf("refs/remotes/%s/%s", remote, defaultBranch)
+	if !gitRefExists(dir, fullRef) {
+		return 0, 0, nil
+	}
+	return aheadBehindAgainstRef(dir, fmt.Sprintf("%s/%s", remote, defaultBranch))
+}
+
+func aheadBehindAgainstRef(dir, ref string) (ahead, behind int, err error) {
+	out, err := Run(dir, "rev-list", "--left-right", "--count", ref+"...HEAD")
+	if err != nil {
+		return 0, 0, err
+	}
+	fields := strings.Fields(out)
+	if len(fields) != 2 {
+		return 0, 0, fmt.Errorf("unexpected rev-list output: %s", out)
+	}
+	behind, err = strconv.Atoi(fields[0])
+	if err != nil {
+		return 0, 0, err
+	}
+	ahead, err = strconv.Atoi(fields[1])
+	if err != nil {
+		return 0, 0, err
+	}
+	return ahead, behind, nil
 }

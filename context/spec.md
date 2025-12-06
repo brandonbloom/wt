@@ -64,6 +64,9 @@
 - When run inside a specific worktree, highlight that worktree with additional detail while still summarizing the others.
 - Output should respect the “silence is golden” philosophy where possible (e.g., avoid gratuitous chatter when nothing noteworthy changed).
 - Performance expectations: local info renders essentially instantly, even with dozens or a few hundred worktrees; remote/GitHub data may stream in afterward, showing placeholders such as “pending…” and respecting Ctrl+C to abort remote fetches. When attached to an interactive TTY, continuously re-render the status table in place so PR updates stream live without relying on external progress libraries. When stdout is not a TTY, emit a single non-interactive pass suitable for scripts.
+- Branch status must convey two perspectives without overwhelming the table:
+  - Upstream divergence (relative to the branch’s configured upstream, or inferred equivalent) stays as the existing `↑N`/`↓M` markers.
+  - Divergence from the configured default branch (e.g., `origin/main`) is shown inline via a short badge appended to the branch column, e.g., `[+5 -2]` when the worktree is five commits ahead and two commits behind the default branch. Omit the badge entirely when both counts are zero.
 
 ## `wt doctor`
 - Purpose: verify the environment and installation so that all `wt` functionality will succeed (shell wrapper installed, directory layout valid, git state sane, etc.).

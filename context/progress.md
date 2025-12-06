@@ -48,8 +48,8 @@ This file tracks every requirement from `context/spec.md`. Update the checkboxes
 - [x] Displays branch name, ahead/behind counts, and dirty state indicators.
 - [x] Uses newest dirty/staged file mtime when dirty, else HEAD commit timestamp, and renders the value as a friendly relative string (e.g., `3s ago`, `2 min ago`, `yesterday 2pm`, `4 days ago`).
 - [ ] Runs lightweight doctor checks (wrapper active, `.wt` present, default worktree healthy) before collecting git status.
-- [ ] Shows GitHub PR status for associated branches, fetching via `gh pr list`, with streaming placeholders (`pending…`) and Ctrl+C-friendly behavior.
-- [ ] Streams GitHub fetch progress with go-pretty widgets when attached to a TTY and degrades to single-pass output when redirected.
+- [x] Shows GitHub PR status for associated branches, fetching via `gh pr list`, with streaming placeholders (`pending…`) and Ctrl+C-friendly behavior.
+- [x] Streams GitHub fetch progress by re-rendering the status table when attached to a TTY and degrades to single-pass output when redirected.
 - [ ] Prefers silence when nothing noteworthy changed but surfaces actionable info when it does.
 
 ## `wt doctor`
@@ -61,8 +61,8 @@ This file tracks every requirement from `context/spec.md`. Update the checkboxes
 - [x] Prints only failures by default; `--verbose` reports each check result even when passing.
 
 ## GitHub Integration
-- [ ] All GitHub data flows through the `gh` CLI (PR discovery, repo metadata).
-- [ ] Associates worktrees/branches with PRs via `gh pr list --head <branch>` (with fallbacks) and handles multiple/zero matches explicitly.
+- [x] All GitHub data flows through the `gh` CLI (PR discovery, repo metadata).
+- [x] Associates worktrees/branches with PRs via `gh pr list --head <branch>` (with fallbacks) and handles multiple/zero matches explicitly.
 
 ## Error Handling
 - [ ] All commands emit actionable, early error messages and stop before causing damage.

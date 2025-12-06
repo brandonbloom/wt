@@ -11,7 +11,7 @@ func Execute() error {
 func newRootCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "wt",
-		Short:         "Worktree swiss-army knife for multi-branch repositories",
+		Short:         "Brandon Bloom's experimental, opinionated, personal worktree manager.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE:          runStatus,
@@ -21,9 +21,18 @@ func newRootCommand() *cobra.Command {
 		newInitCommand(),
 		newCloneCommand(),
 		newNewCommand(),
+		newStatusCommand(),
 		newActivateCommand(),
 		newDoctorCommand(),
 	)
 
 	return cmd
+}
+
+func newStatusCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "status",
+		Short: "Show the wt status dashboard",
+		RunE:  runStatus,
+	}
 }

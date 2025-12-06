@@ -1,24 +1,26 @@
-$ ./scripts/cleanup.sh tmprepo
-$ mkdir tmprepo
-$ cd tmprepo
-$ export GIT_AUTHOR_NAME=wt-test
-$ export GIT_AUTHOR_EMAIL=wt@example.com
-$ export GIT_COMMITTER_NAME=wt-test
-$ export GIT_COMMITTER_EMAIL=wt@example.com
-$ export GIT_AUTHOR_DATE='2000-01-01T00:00:00Z'
-$ export GIT_COMMITTER_DATE='2000-01-01T00:00:00Z'
-$ git init -b main >/dev/null
-$ echo hi > README.md
-$ git add README.md
-$ git commit -m init >/dev/null
-$ ../bin/wt init >/dev/null
-$ cd main
-$ ../../bin/wt new demo-branch --base main >/dev/null 2>&1
-$ cd ../demo-branch
-$ export WT_NOW='2000-01-03T00:00:00Z'
-$ ../../bin/wt
+$ ./transcripts/entrypoint.sh bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && ../../bin/wt'
 2 warning: shell wrapper missing; add `eval "$(wt activate)"` to your shell rc
-1 * demo-branch  demo-branch ↑0 ↓0    2 days ago (PR: pending)
-1   main         main ↑0 ↓0           2 days ago (PR: pending)
-$ cd ../..
-$ ./scripts/cleanup.sh tmprepo
+1 * main   main           2 days ago   (PR: none)   
+$ ./transcripts/entrypoint.sh bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && ../../bin/wt status'
+2 warning: shell wrapper missing; add `eval "$(wt activate)"` to your shell rc
+1 * main   main           2 days ago   (PR: none)   
+$ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new demo-branch --base main >/dev/null 2>&1 && cd ../demo-branch && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && ../../bin/wt'
+1 * demo-branch   demo-branch    2 days ago   (PR: open #…)
+1   main          main           2 days ago   (PR: none)   
+$ ./transcripts/entrypoint.sh bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && script -q /dev/null ../../bin/wt | hexdump -C'
+2 warning: shell wrapper missing; add `eval "$(wt activate)"` to your shell rc
+1 00000000  5e 44 08 08 2a 20 6d 61  69 6e 20 20 20 6d 61 69  |^D..* main   mai|
+1 00000010  6e 20 20 20 20 20 20 20  20 20 20 20 32 20 64 61  |n           2 da|
+1 00000020  79 73 20 61 67 6f 20 20  20 28 50 52 3a 20 6e 6f  |ys ago   (PR: no|
+1 00000030  6e 65 29 20 20 20 0a                              |ne)   .|
+1 00000037
+$ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new demo-branch --base main >/dev/null 2>&1 && cd ../demo-branch && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && script -q /dev/null ../../bin/wt | hexdump -C'
+1 00000000  5e 44 08 08 2a 20 64 65  6d 6f 2d 62 72 61 6e 63  |^D..* demo-branc|
+1 00000010  68 20 20 20 64 65 6d 6f  2d 62 72 61 6e 63 68 20  |h   demo-branch |
+1 00000020  20 20 20 32 20 64 61 79  73 20 61 67 6f 20 20 20  |   2 days ago   |
+1 00000030  28 50 52 3a 20 6f 70 65  6e 20 23 e2 80 a6 29 0a  |(PR: open #...).|
+1 00000040  20 20 6d 61 69 6e 20 20  20 20 20 20 20 20 20 20  |  main          |
+1 00000050  6d 61 69 6e 20 20 20 20  20 20 20 20 20 20 20 32  |main           2|
+1 00000060  20 64 61 79 73 20 61 67  6f 20 20 20 28 50 52 3a  | days ago   (PR:|
+1 00000070  20 6e 6f 6e 65 29 20 20  20 0a                    | none)   .|
+1 0000007a

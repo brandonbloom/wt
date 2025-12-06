@@ -63,7 +63,7 @@
   - If the branch has an associated GitHub pull request, display its status.
 - When run inside a specific worktree, highlight that worktree with additional detail while still summarizing the others.
 - Output should respect the “silence is golden” philosophy where possible (e.g., avoid gratuitous chatter when nothing noteworthy changed).
-- Performance expectations: local info renders essentially instantly, even with dozens or a few hundred worktrees; remote/GitHub data may stream in afterward, showing placeholders such as “pending…” and respecting Ctrl+C to abort remote fetches. When attached to an interactive TTY, stream GitHub fetches using [`git@github.com:jedib0t/go-pretty.git`](https://github.com/jedib0t/go-pretty) progress widgets (indeterminate bars/spinners). When stdout is not a TTY, emit a single non-interactive pass suitable for scripts.
+- Performance expectations: local info renders essentially instantly, even with dozens or a few hundred worktrees; remote/GitHub data may stream in afterward, showing placeholders such as “pending…” and respecting Ctrl+C to abort remote fetches. When attached to an interactive TTY, continuously re-render the status table in place so PR updates stream live without relying on external progress libraries. When stdout is not a TTY, emit a single non-interactive pass suitable for scripts.
 
 ## `wt doctor`
 - Purpose: verify the environment and installation so that all `wt` functionality will succeed (shell wrapper installed, directory layout valid, git state sane, etc.).

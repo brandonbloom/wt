@@ -122,6 +122,34 @@ case "$sub" in
       exit 0
     fi
     ;;
+  pr)
+    if [ "${1:-}" = "list" ]; then
+      branch=""
+      while [ $# -gt 0 ]; do
+        case "$1" in
+          --head)
+            branch="$2"
+            shift 2
+            ;;
+          --json|--limit|--state)
+            shift 2
+            ;;
+          *)
+            shift
+            ;;
+        esac
+      done
+      if [ -n "${WT_TEST_GH_DELAY:-}" ]; then
+        sleep "${WT_TEST_GH_DELAY}"
+      fi
+      if [ "$branch" = "demo-branch" ]; then
+        printf '[{"number":42,"state":"OPEN","isDraft":false}]\n'
+      else
+        printf '[]\n'
+      fi
+      exit 0
+    fi
+    ;;
 esac
 
 echo "gh stub cannot handle: $sub $*" >&2

@@ -1050,6 +1050,12 @@ func tidyActionLabel(cand *tidyCandidate) string {
 }
 
 func describePRSummary(cand *tidyCandidate) string {
+	if cand == nil {
+		return "none"
+	}
+	if cand.UniqueAhead == 0 && !cand.Dirty && !cand.HasStash {
+		return "none"
+	}
 	if len(cand.PRs) == 0 {
 		return "none"
 	}

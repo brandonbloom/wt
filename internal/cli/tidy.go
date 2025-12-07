@@ -50,6 +50,8 @@ type tidyOptions struct {
 	safeAlias   bool
 	allAlias    bool
 	promptAlias bool
+	killFlag    string
+	timeoutFlag string
 }
 
 func newTidyCommand() *cobra.Command {
@@ -66,6 +68,11 @@ func newTidyCommand() *cobra.Command {
 	cmd.Flags().BoolVarP(&opts.safeAlias, "safe", "s", false, "alias for --policy safe")
 	cmd.Flags().BoolVarP(&opts.allAlias, "all", "a", false, "alias for --policy all")
 	cmd.Flags().BoolVarP(&opts.promptAlias, "prompt", "p", false, "alias for --policy prompt")
+	cmd.Flags().StringVarP(&opts.killFlag, "kill", "k", "", "terminate blocking processes before cleanup (optionally pass a signal)")
+	if flag := cmd.Flags().Lookup("kill"); flag != nil {
+		flag.NoOptDefVal = "true"
+	}
+	cmd.Flags().StringVar(&opts.timeoutFlag, "timeout", "", "time to wait for --kill to succeed (e.g. 3s)")
 	return cmd
 }
 
@@ -89,6 +96,25 @@ func runTidy(cmd *cobra.Command, opts *tidyOptions) error {
 		return err
 	}
 
+	killEnabled := false
+	killSignalSpec := ""
+	if opts.killFlag != "" {
+		killEnabled = true
+		if opts.killFlag != "true" {
+			killSignalSpec = opts.killFlag
+		}
+	}
+	if opts.timeoutFlag != "" && !killEnabled {
+		return fmt.Errorf("--timeout requires --kill")
+	}
+	var killCfg killSettings
+	if killEnabled {
+		killCfg, err = resolveKillSettings(killSignalSpec, opts.timeoutFlag, proj.Config.Process.KillTimeoutDuration())
+		if err != nil {
+			return err
+		}
+	}
+
 	now := currentTimeOverride()
 	candidates, err := collectTidyCandidates(cmd.Context(), proj, now)
 	if err != nil {
@@ -107,16 +133,31 @@ func runTidy(cmd *cobra.Command, opts *tidyOptions) error {
 
 	safe, gray, blocked := classifyCandidates(candidates, now, ui)
 
+	var killPlan *killSettings
+	if killEnabled {
+		killPlan = &killCfg
+		changed, err := tidyKillProcesses(cmd, safe, gray, killCfg, opts.dryRun, ui)
+		if err != nil {
+			return err
+		}
+		if changed {
+			if err := attachProcessesToCandidates(candidates); err != nil {
+				return err
+			}
+			safe, gray, blocked = classifyCandidates(candidates, now, ui)
+		}
+	}
+
 	if opts.dryRun {
 		if ui.Interactive() {
 			return nil
 		}
-		return renderDryRun(cmd.OutOrStdout(), safe, gray, blocked, now)
+		return renderDryRun(cmd.OutOrStdout(), safe, gray, blocked, now, killPlan)
 	}
 
 	if !ui.Interactive() {
 		fmt.Fprintln(cmd.OutOrStdout(), "Plan:")
-		renderDryRun(cmd.OutOrStdout(), safe, gray, blocked, now)
+		renderDryRun(cmd.OutOrStdout(), safe, gray, blocked, now, killPlan)
 		fmt.Fprintln(cmd.OutOrStdout())
 	}
 
@@ -446,8 +487,13 @@ func deriveClassification(cand *tidyCandidate, now time.Time) {
 	}
 }
 
-func renderDryRun(out io.Writer, safe, gray, blocked []*tidyCandidate, now time.Time) error {
+func renderDryRun(out io.Writer, safe, gray, blocked []*tidyCandidate, now time.Time, killPlan *killSettings) error {
 	sections := 0
+	if killPlan != nil {
+		targets := append([]*tidyCandidate{}, safe...)
+		targets = append(targets, gray...)
+		renderKillPreview(out, targets, killPlan.SignalLabel)
+	}
 	if len(safe) > 0 {
 		sections++
 		fmt.Fprintln(out, "Will clean up:")
@@ -487,6 +533,28 @@ func renderDryRun(out io.Writer, safe, gray, blocked []*tidyCandidate, now time.
 		fmt.Fprintln(out, "- git remote prune origin")
 	}
 	return nil
+}
+
+func renderKillPreview(out io.Writer, candidates []*tidyCandidate, signalLabel string) bool {
+	printed := false
+	for _, cand := range candidates {
+		if len(cand.Processes) == 0 {
+			continue
+		}
+		if !printed {
+			fmt.Fprintln(out, "Process cleanup:")
+			printed = true
+		}
+		fmt.Fprintf(out, "- %s\n", cand.Worktree.Name)
+		for _, proc := range cand.Processes {
+			fmt.Fprintf(out, "    %s (%d)\n", processCommandLabel(proc.Command), proc.PID)
+		}
+		fmt.Fprintf(out, "    signal: %s\n", signalLabel)
+	}
+	if printed {
+		fmt.Fprintln(out)
+	}
+	return printed
 }
 
 func plannedActions(cand *tidyCandidate) []string {
@@ -605,6 +673,56 @@ func executeTidies(cmd *cobra.Command, proj *project.Project, candidates []*tidy
 		}
 	}
 	return nil
+}
+
+func tidyKillProcesses(cmd *cobra.Command, safe, gray []*tidyCandidate, settings killSettings, dryRun bool, ui *tidyUI) (bool, error) {
+	if len(safe) == 0 && len(gray) == 0 {
+		return false, nil
+	}
+	targets := make([]*tidyCandidate, 0, len(safe)+len(gray))
+	targets = append(targets, safe...)
+	targets = append(targets, gray...)
+
+	filtered := make([]*tidyCandidate, 0, len(targets))
+	for _, cand := range targets {
+		if len(cand.Processes) > 0 {
+			filtered = append(filtered, cand)
+		}
+	}
+	if len(filtered) == 0 || dryRun {
+		return false, nil
+	}
+
+	logWriter := cmd.OutOrStdout()
+	if ui != nil && ui.Interactive() {
+		logWriter = nil
+	}
+	terminator := newProcessTerminator()
+	changed := false
+
+	for _, cand := range filtered {
+		if logWriter != nil {
+			fmt.Fprintf(logWriter, "Killing processes in %s (signal %s)\n", cand.Worktree.Name, settings.SignalLabel)
+		}
+		err := terminateWorktreeProcesses(cmd.Context(), cand.Worktree, cand.Processes, settings, terminator)
+		if err != nil {
+			if errors.Is(err, errProcessUnsupported) || errors.Is(err, context.Canceled) {
+				return changed, err
+			}
+			msg := fmt.Sprintf("process cleanup failed: %s", singleLineError(err))
+			cand.BlockReasons = append(cand.BlockReasons, msg)
+			if logWriter != nil {
+				fmt.Fprintf(logWriter, "  failed: %s\n", singleLineError(err))
+			}
+			continue
+		}
+		if logWriter != nil {
+			fmt.Fprintln(logWriter, "  cleared")
+		}
+		changed = true
+	}
+
+	return changed, nil
 }
 
 func shouldPrompt(class tidyClassification, policy tidyPolicy) bool {

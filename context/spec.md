@@ -39,6 +39,7 @@
   - `default_branch = "main"` (string) which must match the default branch reported by GitHub for the repository.
   - `[bootstrap]` section with a `run = "..."` field whose contents are executed in the user’s default shell (`$SHELL`) immediately after `wt new` creates and enters a worktree. The command runs synchronously and inherits stdin/stdout/stderr; failures abort the `wt new` flow with a clear message.
   - Optional `[bootstrap].strict = false` toggle; when omitted, bootstrap scripts execute under `set -euo pipefail` for safety. Setting `strict = false` reverts to lenient shell semantics.
+  - Optional `[process]` section with `kill_timeout = "3s"` (Go duration syntax) that provides the default wait time used by `wt kill` and `wt tidy --kill` before they report a stubborn process as still running. Command-line `--timeout` flags override this value.
 - The README must document the configuration file, the `default_branch` field, and the `[bootstrap]` section semantics so that users can edit it without referring to the source.
 - A dedicated `wt bootstrap` command reruns the configured bootstrap script within the current worktree, allowing users to reset dependencies or rerun setup later. It respects the `[bootstrap].strict` setting but also accepts `--strict`, `--no-strict`, and `-x/--xtrace` flags to temporarily override strict mode or enable shell tracing.
 
@@ -127,6 +128,28 @@
   - When skipping a worktree (blocked or rejected prompt), explain why so the user can fix or rerun.
   - The README “Everyday Usage” section should mention `wt tidy` with only the high-traffic flags (`--dry-run`, `--safe`, `--all`), while the detailed config and prompt behaviors belong in `DEVELOPING.md` or a dedicated docs section.
 - Cover the new command with transcript fixtures that demonstrate safe cleanup, gray prompting, dry-run output, and blocked cases.
+
+## Process Termination (`wt kill`, `wt tidy --kill/-k`)
+
+- Definition: a “tidy-blocking process” is any process owned by the current user whose working directory (after resolving symlinks) is located inside a worktree directory. These are already surfaced on the status dashboard and cause `wt tidy` to classify the worktree as gray/blocked.
+- `wt kill <worktree ...>` targets one or more specific worktrees (names or paths resolved using the same resolver shared with `wt rm`). At least one target is required; duplicates collapse to a single worktree.
+  - The command inspects each target to find its tidy-blocking processes. It prints a concise header per worktree followed by `command (pid)` entries; if none exist it reports “nothing to kill” and proceeds.
+  - Signals default to `SIGTERM (15)` and can be changed via `--signal=<name|number>`. Provide a shorthand `-9` flag equivalent to `--signal=9`. Symbolic names (e.g., `TERM`, `HUP`) and numeric IDs must both be accepted. `-9` can be combined with other flags (`wt kill -9 -n foo`).
+  - `--dry-run/-n` lists the processes and signals that would be sent without actually delivering them. The command must not mutate anything in dry-run mode but still exits non-zero if an invalid worktree name/path was supplied.
+  - Signal delivery happens per process; failures (e.g., `ESRCH`, `EPERM`) are reported inline. Any failure after attempting all processes forces a non-zero exit code even when other processes were terminated successfully so operators notice the incomplete cleanup.
+  - `--timeout=<duration>` (default 3s) controls how long the command waits for each process to exit after receiving the signal. While waiting it periodically refreshes the process list; if the processes survive past the timeout the command reports the holdouts and fails.
+- `wt kill` and `wt tidy` share the resolver/timeout/signal parsing logic to avoid drift. The timeout default comes from a config knob (see below) but can always be overridden by the flag.
+- `wt tidy` grows `--kill` / `-k` (optionally `--kill=<signal>`). This flag instructs tidy to proactively terminate tidy-blocking processes for any worktree it plans to clean up.
+  - `--kill` without a value uses the same default signal as `wt kill` (SIGTERM). Supplying a value (e.g., `--kill=9` or `-k9`) overrides the signal; both numeric IDs and symbolic names are accepted, though `-k` with an attached value (`-k9`) only supports numeric for simple parsing.
+  - `--timeout=<duration>` (default 3s, shared with `wt kill`) governs how long tidy waits after signaling before re-checking the classification. Timeouts happen per worktree so a long-running process in one tree does not stall the entire command.
+  - In `--dry-run` mode the kill flag only reports which processes would be terminated.
+  - The kill attempt runs after classification but before prompting/deletion so blocked worktrees can become eligible for cleanup. Once all targeted processes exit (confirmed via the same detection logic), tidy re-runs the dirty/process checks and resumes the normal policy flow.
+  - If a process refuses to exit after the configured signal and a short retry window, tidy leaves the worktree in the blocked set and reports the failure instead of forcefully deleting the directory.
+- Both commands default to the timeout configured under `[process].kill_timeout` (Go duration syntax, default `3s`). Flag values override the config, and environment variables are not required.
+- Testing/documentation:
+  - Add transcript coverage showing `wt kill` dry-run vs actual termination and the way tidy uses `--kill`.
+  - Update the README “Everyday Usage” section (high-traffic flags only) plus deeper docs (`DEVELOPING.md` or a dedicated tidy reference) to describe both commands and the risk involved in terminating processes.
+- Future process config: leave room for ignore/allow lists to refine how processes influence `wt tidy` (e.g., ignore `code` helper tasks but always block `psql` or `terraform` runners) and for default signal selection once we learn whether `wt tidy --kill` should default to on/off per project.
 
 ## Targeted Removal (`wt rm`)
 

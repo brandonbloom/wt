@@ -47,12 +47,7 @@ func attachProcessesToCandidates(candidates []*tidyCandidate) error {
 	}
 	for _, cand := range candidates {
 		key := canonicalizePath(cand.Worktree.Path)
-		if procs := processMap[key]; len(procs) > 0 {
-			cand.Processes = append([]processes.Process(nil), procs...)
-			if summary := summarizeProcesses(procs, defaultProcessSummaryLimit); summary != "-" {
-				cand.extraGrayReasons = append(cand.extraGrayReasons, "processes running: "+summary)
-			}
-		}
+		updateCandidateProcesses(cand, processMap[key])
 	}
 	return nil
 }
@@ -167,4 +162,33 @@ func pruneProcessList(procs []processes.Process) []processes.Process {
 		}
 	}
 	return out
+}
+
+func updateCandidateProcesses(cand *tidyCandidate, procs []processes.Process) {
+	if cand == nil {
+		return
+	}
+	removeProcessGrayReason(cand)
+	if len(procs) == 0 {
+		cand.Processes = nil
+		return
+	}
+	cand.Processes = append([]processes.Process(nil), procs...)
+	if summary := summarizeProcesses(procs, defaultProcessSummaryLimit); summary != "-" {
+		cand.extraGrayReasons = append(cand.extraGrayReasons, "processes running: "+summary)
+	}
+}
+
+func removeProcessGrayReason(cand *tidyCandidate) {
+	if cand == nil || len(cand.extraGrayReasons) == 0 {
+		return
+	}
+	filtered := cand.extraGrayReasons[:0]
+	for _, reason := range cand.extraGrayReasons {
+		if strings.HasPrefix(reason, "processes running:") {
+			continue
+		}
+		filtered = append(filtered, reason)
+	}
+	cand.extraGrayReasons = filtered
 }

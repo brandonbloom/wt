@@ -28,6 +28,11 @@ func List() ([]Process, error) {
 	return listNative(os.Getuid())
 }
 
+// TestDataFilePath reports the file path used for WT_PROCESS_TEST_DATA_FILE, if any.
+func TestDataFilePath() string {
+	return os.Getenv(testDataFileEnv)
+}
+
 func fromTestData() ([]Process, bool, error) {
 	if path := os.Getenv(testDataFileEnv); path != "" {
 		data, err := os.ReadFile(path)

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	toml "github.com/pelletier/go-toml/v2"
 )
@@ -16,6 +17,7 @@ type Config struct {
 	DefaultBranch string         `toml:"default_branch"`
 	Bootstrap     BootstrapBlock `toml:"bootstrap"`
 	Tidy          TidyBlock      `toml:"tidy"`
+	Process       ProcessBlock   `toml:"process"`
 }
 
 // BootstrapBlock describes commands that run after creating a new worktree.
@@ -57,6 +59,40 @@ func (t TidyBlock) Validate() error {
 	}
 }
 
+// ProcessBlock configures process handling behavior.
+type ProcessBlock struct {
+	KillTimeout string `toml:"kill_timeout"`
+}
+
+func (p *ProcessBlock) applyDefaults() {
+	if p == nil {
+		return
+	}
+	if strings.TrimSpace(p.KillTimeout) == "" {
+		p.KillTimeout = "3s"
+	}
+}
+
+func (p ProcessBlock) Validate() error {
+	if strings.TrimSpace(p.KillTimeout) == "" {
+		return nil
+	}
+	d, err := time.ParseDuration(p.KillTimeout)
+	if err != nil || d <= 0 {
+		return ErrInvalidProcessTimeout
+	}
+	return nil
+}
+
+// KillTimeoutDuration returns the configured timeout or the default when unset.
+func (p ProcessBlock) KillTimeoutDuration() time.Duration {
+	d, err := time.ParseDuration(p.KillTimeout)
+	if err != nil || d <= 0 {
+		return 3 * time.Second
+	}
+	return d
+}
+
 // StrictEnabled reports whether strict shell options should be enabled.
 func (b BootstrapBlock) StrictEnabled() bool {
 	if b.Strict == nil {
@@ -70,6 +106,8 @@ var (
 	ErrMissingDefaultBranch = errors.New("config.default_branch must be set")
 	// ErrInvalidTidyPolicy indicates the tidy policy is not recognized.
 	ErrInvalidTidyPolicy = errors.New("config.tidy.policy must be auto, safe, all, or prompt")
+	// ErrInvalidProcessTimeout indicates the process kill timeout is invalid.
+	ErrInvalidProcessTimeout = errors.New("config.process.kill_timeout must be a positive duration (e.g. 3s)")
 )
 
 // Default returns a baseline configuration for a project.
@@ -81,6 +119,7 @@ func Default(defaultBranch string) Config {
 	cfg := Config{
 		DefaultBranch: defaultBranch,
 		Bootstrap:     BootstrapBlock{},
+		Process:       ProcessBlock{},
 	}
 	cfg.applyDefaults()
 	return cfg
@@ -88,6 +127,7 @@ func Default(defaultBranch string) Config {
 
 func (c *Config) applyDefaults() {
 	c.Tidy.applyDefaults()
+	c.Process.applyDefaults()
 }
 
 // Validate ensures the configuration can guide wt's behavior.
@@ -96,6 +136,9 @@ func (c Config) Validate() error {
 		return ErrMissingDefaultBranch
 	}
 	if err := c.Tidy.Validate(); err != nil {
+		return err
+	}
+	if err := c.Process.Validate(); err != nil {
 		return err
 	}
 	return nil

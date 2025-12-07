@@ -111,6 +111,44 @@ Key behaviors:
 
 Cleanup steps mirror `wt tidy`: remove the worktree directory, delete the local branch, delete the remote branch if its tip still matches, close any open PRs through `gh`, and run `git remote prune origin` once if at least one remote ref was removed.
 
+## Process Cleanup (`wt kill`, `wt tidy --kill`)
+
+Active processes inside a worktree force `wt tidy` to classify it as gray. Use the new process cleanup commands when those long-running jobs are safe to terminate so tidying can proceed.
+
+### `wt kill <worktrees...>`
+
+Targets one or more worktrees (names or paths resolved the same way as `wt rm`) and sends signals to any processes whose working directory lives inside each worktree. At least one target is required; duplicates are ignored.
+
+- `-n, --dry-run` – List the processes and signals that would be sent without mutating anything.
+- `--signal, -s <value>` – Choose the signal (numeric or name like `TERM`, `HUP`). `-9` is shorthand for `--signal=9`.
+- `--timeout=<duration>` – Override how long the command waits for processes to exit before declaring failure (defaults to the configured `kill_timeout`).
+
+Output renders a small block per worktree:
+
+```
+busy-branch:
+  - server (1111)
+  - worker (2222)
+  sending SIGTERM (15) to 2 processes
+  cleared
+
+idle-branch:
+  nothing to kill
+```
+
+Failures (e.g., `EPERM`, `ESRCH`, timeouts) produce per-worktree errors and the command exits non-zero while still attempting later targets.
+
+### `wt tidy --kill`
+
+Add `--kill` (or `-k`) when running `wt tidy` to automatically terminate blocking processes before prompting or deleting worktrees. Supplying a value (`--kill=9`, `-k9`) changes the signal; otherwise the default `SIGTERM` is used. The flag respects `--dry-run` by only reporting which processes would be terminated.
+
+Additional knobs:
+
+- `--timeout=<duration>` overrides the wait time (shared with `wt kill`).
+- `.wt/config.toml` exposes `[process].kill_timeout = "3s"` to change the default wait globally (see the Configuration Reference).
+
+`wt tidy --kill` re-scans processes after the termination attempt. Successfully cleared worktrees drop back into the safe/gray flow, while those that refuse to exit remain in the blocked set with a new block reason explaining the failure. When stdout is not a TTY, the preflight plan now includes a “Process cleanup” section listing the worktrees and signals slated for termination.
+
 ## Shell Integration
 
 The installed Go binary emits shell code when you run `wt activate`. Evaluating the output defines a shell function (also named `wt`) that proxies to the binary and applies directory changes requested by subcommands such as `wt new`. The root command (`wt` or `wt status`) also detects when the wrapper is missing and prints instructions before doing other work.

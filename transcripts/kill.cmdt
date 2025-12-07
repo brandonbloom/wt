@@ -1,0 +1,11 @@
+$ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; ../../bin/wt new busy --base main >/dev/null; ../../bin/wt new idle --base main >/dev/null; printf '"'"'[{"pid":1111,"ppid":100,"command":"server","cwd":"%s/../busy"},{"pid":2222,"ppid":100,"command":"worker","cwd":"%s/../busy"},{"pid":3333,"ppid":100,"command":"logger","cwd":"%s/../idle"}]\n'"'"' "$(pwd)" "$(pwd)" "$(pwd)" >processes.json; export PATH="$(pwd)/../bin:$PATH"; export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json"; ../../bin/wt kill -n -9 busy ../idle'
+2 Preparing worktree (new branch 'busy')
+2 Preparing worktree (new branch 'idle')
+2 unknown command "kill" for "wt"
+? 1
+
+$ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; ../../bin/wt new busy --base main >/dev/null; ../../bin/wt new idle --base main >/dev/null; printf '"'"'[{"pid":1111,"ppid":100,"command":"server","cwd":"%s/../busy"},{"pid":2222,"ppid":100,"command":"worker","cwd":"%s/../busy"},{"pid":3333,"ppid":100,"command":"logger","cwd":"%s/../idle"}]\n'"'"' "$(pwd)" "$(pwd)" "$(pwd)" >processes.json; export PATH="$(pwd)/../bin:$PATH"; export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json"; ../../bin/wt kill --signal=hup busy; cat processes.json'
+2 Preparing worktree (new branch 'busy')
+2 Preparing worktree (new branch 'idle')
+2 unknown command "kill" for "wt"
+? 1

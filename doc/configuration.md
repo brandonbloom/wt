@@ -57,6 +57,16 @@ Controls the default behavior of `wt tidy`. All keys are optional; the CLI falls
 - Type: integer (default `20`).
 - Branches with more than this many commits ahead or behind the default branch become gray even if they are otherwise clean.
 
+## `[process]` Table
+
+Controls process cleanup defaults shared by `wt kill` and `wt tidy --kill`.
+
+### `kill_timeout`
+
+- Type: duration string (default `"3s"`).
+- Determines how long the commands wait for a process to exit after sending the signal. Values follow Go’s duration syntax (`500ms`, `2s`, `1m30s`, etc.).
+- `wt kill --timeout` and `wt tidy --kill --timeout` override this per invocation.
+
 ## Editing Tips
 
 - Because `.wt/` is not part of git, edits affect only the local machine. Copy the file manually if you need to share settings.

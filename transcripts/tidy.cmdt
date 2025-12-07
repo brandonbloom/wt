@@ -30,17 +30,19 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 1 - git remote prune origin
 1
 1 Skipped dirty-branch: worktree has uncommitted changes
+1 
 1 gray-branch (branch gray-branch)
-1   PR: #102 open
-1   Divergence vs main: +2/-0
+1 ----------------------------------------
+1   PR:            #102 open
+1   Divergence:    +2/-0 vs main
 1   Last activity: Jan 15
-1   Dirty: no
-1   Stash: no
+1   Dirty/Stash:   no / no
+1   Worktree:      /Users/bbloom/Projects/wt/main/tmprepo/gray-branch
 1   Reasons:
 1     - commits not merged into main
 1     - PR #102 open
 1     - stale for 17 days
-1 Proceed with cleanup? [y/N]: 
+1 Proceed with cleanup? [y/N/q]: 
 1 Cleaning gray-branch (branch gray-branch)
 1   removed worktree /Users/bbloom/Projects/wt/main/tmprepo/gray-branch
 1   deleted local branch gray-branch
@@ -56,3 +58,51 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 1   deleted remote branch origin/safe-branch
 1   closed PR #101
 1 Pruned remote origin
+
+$ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new safe-branch --base main >/dev/null; cd ../safe-branch; echo safe >>README.md; git add README.md; git commit -m "safe change" >/dev/null; git push -u origin safe-branch >/dev/null; cd ../main; git merge safe-branch >/dev/null; ../../bin/wt new gray-branch --base main >/dev/null; cd ../gray-branch; echo gray >>README.md; git add README.md; git commit -m "gray change" >/dev/null; git push -u origin gray-branch >/dev/null; cd ../main; ../../bin/wt new dirty-branch --base main >/dev/null; cd ../dirty-branch; echo dirty >>README.md; cd ../main; printf "%s\n" "safe-branch|101|OPEN|false|2000-01-10T00:00:00Z|https://example.com/pr/101" "gray-branch|102|OPEN|false|2000-01-15T00:00:00Z|https://example.com/pr/102" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; printf "q\n" | WT_NOW=2000-02-01T00:00:00Z ../../bin/wt tidy'
+2 To ../remote.git
+2  * [new branch]      main -> main
+2 Preparing worktree (new branch 'safe-branch')
+2 To ../remote.git
+2  * [new branch]      safe-branch -> safe-branch
+2 Preparing worktree (new branch 'gray-branch')
+2 To ../remote.git
+2  * [new branch]      gray-branch -> gray-branch
+2 Preparing worktree (new branch 'dirty-branch')
+1 Plan:
+1 Will clean up:
+1 - safe-branch (branch safe-branch)
+1     remove worktree /Users/bbloom/Projects/wt/main/tmprepo/safe-branch
+1     delete local branch safe-branch
+1     delete remote branch origin/safe-branch
+1     close PR #101
+1
+1 Will prompt for:
+1 - gray-branch (branch gray-branch)
+1     reasons:
+1       * commits not merged into main
+1       * PR #102 open
+1       * stale for 17 days
+1
+1 Will skip:
+1 - dirty-branch (worktree has uncommitted changes)
+1
+1 Remote maintenance:
+1 - git remote prune origin
+1
+1 Skipped dirty-branch: worktree has uncommitted changes
+1
+1 gray-branch (branch gray-branch)
+1 ----------------------------------------
+1   PR:            #102 open
+1   Divergence:    +2/-0 vs main
+1   Last activity: Jan 15
+1   Dirty/Stash:   no / no
+1   Worktree:      /Users/bbloom/Projects/wt/main/tmprepo/gray-branch
+1   Reasons:
+1     - commits not merged into main
+1     - PR #102 open
+1     - stale for 17 days
+1 Proceed with cleanup? [y/N/q]: 
+1 Skipped gray-branch: quit selected
+1 Skipped safe-branch: quit selected

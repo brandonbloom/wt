@@ -17,6 +17,7 @@ import (
 	"github.com/brandonbloom/wt/internal/gitutil"
 	"github.com/brandonbloom/wt/internal/project"
 	"github.com/brandonbloom/wt/internal/timefmt"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -523,6 +524,7 @@ func executeTidies(cmd *cobra.Command, proj *project.Project, candidates []*tidy
 	}
 
 	var remoteTouched bool
+	var manualAssumeNo bool
 	for _, cand := range candidates {
 		switch cand.Classification {
 		case tidyBlocked:
@@ -530,6 +532,15 @@ func executeTidies(cmd *cobra.Command, proj *project.Project, candidates []*tidy
 			ui.Update(cand)
 			if logWriter != nil {
 				fmt.Fprintf(logWriter, "Skipped %s: %s\n", cand.Worktree.Name, strings.Join(cand.BlockReasons, "; "))
+			}
+			continue
+		}
+
+		if manualAssumeNo {
+			cand.Stage = tidyStageSkipped
+			ui.Update(cand)
+			if logWriter != nil {
+				fmt.Fprintf(logWriter, "Skipped %s: quit selected\n", cand.Worktree.Name)
 			}
 			continue
 		}
@@ -544,18 +555,25 @@ func executeTidies(cmd *cobra.Command, proj *project.Project, candidates []*tidy
 				}
 				continue
 			}
-			proceed, lines, err := promptForCandidate(out, reader, cand, now)
+			proceed, quit, lines, err := promptForCandidate(out, reader, cand, now, ui.Interactive())
 			if ui.Interactive() {
 				ui.AddExtraLines(lines)
 			}
 			if err != nil {
 				return err
 			}
+			if quit {
+				manualAssumeNo = true
+			}
 			if !proceed {
 				cand.Stage = tidyStageSkipped
 				ui.Update(cand)
 				if logWriter != nil {
-					fmt.Fprintf(logWriter, "Skipped %s: declined\n", cand.Worktree.Name)
+					reason := "declined"
+					if quit {
+						reason = "quit selected"
+					}
+					fmt.Fprintf(logWriter, "Skipped %s: %s\n", cand.Worktree.Name, reason)
 				}
 				continue
 			}
@@ -599,36 +617,105 @@ func shouldPrompt(class tidyClassification, policy tidyPolicy) bool {
 	}
 }
 
-func promptForCandidate(out io.Writer, reader *bufio.Reader, cand *tidyCandidate, now time.Time) (bool, int, error) {
+func promptForCandidate(out io.Writer, reader *bufio.Reader, cand *tidyCandidate, now time.Time, useColor bool) (bool, bool, int, error) {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s (branch %s)\n", cand.Worktree.Name, cand.Branch)
-	fmt.Fprintf(&b, "  PR: %s\n", describePRSummary(cand))
-	fmt.Fprintf(&b, "  Divergence vs %s: +%d/-%d\n", cand.defaultBranch, cand.BaseAhead, cand.BaseBehind)
-	fmt.Fprintf(&b, "  Last activity: %s\n", timefmt.Relative(cand.LastActivity, now))
-	fmt.Fprintf(&b, "  Dirty: %s\n", boolLabel(cand.Dirty))
-	fmt.Fprintf(&b, "  Stash: %s\n", boolLabel(cand.HasStash))
-	if len(cand.GrayReasons) > 0 {
-		fmt.Fprintln(&b, "  Reasons:")
-		for _, reason := range cand.GrayReasons {
-			fmt.Fprintf(&b, "    - %s\n", reason)
+
+	title := fmt.Sprintf("%s (branch %s)", cand.Worktree.Name, cand.Branch)
+	divider := promptDivider(len(title))
+	if useColor {
+		title = colorPromptTitle(title)
+		divider = colorPromptDivider(divider)
+	}
+	fmt.Fprintf(&b, "\n%s\n%s\n", title, divider)
+
+	label := func(s string) string {
+		if useColor {
+			return colorPromptLabel(s)
 		}
+		return s
+	}
+	value := func(s string) string {
+		if useColor {
+			return colorPromptValue(s)
+		}
+		return s
+	}
+	boolValue := func(v bool) string {
+		text := boolLabel(v)
+		if !useColor {
+			return text
+		}
+		if v {
+			return colorPromptWarn(text)
+		}
+		return colorPromptGood(text)
+	}
+
+	fmt.Fprintf(&b, "  %-14s %s\n", label("PR:"), value(describePRSummary(cand)))
+	divergence := fmt.Sprintf("+%d/-%d vs %s", cand.BaseAhead, cand.BaseBehind, cand.defaultBranch)
+	fmt.Fprintf(&b, "  %-14s %s\n", label("Divergence:"), value(divergence))
+	fmt.Fprintf(&b, "  %-14s %s\n", label("Last activity:"), value(timefmt.Relative(cand.LastActivity, now)))
+	fmt.Fprintf(&b, "  %-14s %s / %s\n", label("Dirty/Stash:"), boolValue(cand.Dirty), boolValue(cand.HasStash))
+	fmt.Fprintf(&b, "  %-14s %s\n", label("Worktree:"), value(cand.Worktree.Path))
+
+	if len(cand.GrayReasons) > 0 {
+		reasonsLabel := "  Reasons:"
+		if useColor {
+			reasonsLabel = colorPromptLabel(reasonsLabel)
+		}
+		fmt.Fprintln(&b, reasonsLabel)
+		for _, reason := range cand.GrayReasons {
+			reasonText := reason
+			if useColor {
+				reasonText = colorPromptReason(reasonText)
+			}
+			fmt.Fprintf(&b, "    - %s\n", reasonText)
+		}
+	} else {
+		fmt.Fprintln(&b)
 	}
 
 	panel := b.String()
 	fmt.Fprint(out, panel)
-	fmt.Fprint(out, "Proceed with cleanup? [y/N]: ")
+	prompt := "Proceed with cleanup? [y/N/q]: "
+	if useColor {
+		prompt = colorPromptLabel(prompt)
+	}
+	fmt.Fprint(out, prompt)
 
 	resp, err := reader.ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
-		return false, strings.Count(panel, "\n") + 2, err
+		return false, false, strings.Count(panel, "\n") + 2, err
 	}
 	fmt.Fprintln(out)
 
 	resp = strings.TrimSpace(strings.ToLower(resp))
 	ok := resp == "y" || resp == "yes"
+	quit := resp == "q" || resp == "quit"
 	lines := strings.Count(panel, "\n") + 2
-	return ok, lines, nil
+	return ok, quit, lines, nil
 }
+
+func promptDivider(titleLen int) string {
+	width := titleLen
+	if width < 40 {
+		width = 40
+	}
+	if width > 80 {
+		width = 80
+	}
+	return strings.Repeat("-", width)
+}
+
+var (
+	colorPromptTitle   = color.New(color.FgBlue, color.Bold).SprintFunc()
+	colorPromptDivider = color.New(color.FgHiBlack).SprintFunc()
+	colorPromptLabel   = color.New(color.FgBlack, color.Bold).SprintFunc()
+	colorPromptValue   = color.New(color.FgHiBlue).SprintFunc()
+	colorPromptReason  = color.New(color.FgMagenta).SprintFunc()
+	colorPromptWarn    = color.New(color.FgHiRed, color.Bold).SprintFunc()
+	colorPromptGood    = color.New(color.FgGreen, color.Bold).SprintFunc()
+)
 
 func boolLabel(v bool) string {
 	if v {

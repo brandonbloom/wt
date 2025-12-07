@@ -172,6 +172,7 @@ type tidyCandidate struct {
 	RemoteMatchesHead   bool
 	BaseAhead           int
 	BaseBehind          int
+	UniqueAhead         int
 	LastActivity        time.Time
 	PRs                 []pullRequestInfo
 	BlockReasons        []string
@@ -314,6 +315,11 @@ func inspectWorktreeBase(ctx context.Context, proj *project.Project, wt project.
 		return markTidyGitError(cand, err)
 	}
 
+	cand.UniqueAhead, err = gitutil.UniqueCommitsComparedTo(wt.Path, proj.Config.DefaultBranch)
+	if err != nil {
+		return markTidyGitError(cand, err)
+	}
+
 	remoteHash, exists, err := gitutil.RemoteBranchHead(proj.DefaultWorktreePath, "origin", cand.Branch)
 	if err != nil {
 		return markTidyGitError(cand, err)
@@ -431,7 +437,8 @@ func deriveClassification(cand *tidyCandidate, now time.Time) {
 	reasons := make([]string, 0, len(cand.extraGrayReasons)+4)
 	reasons = append(reasons, cand.extraGrayReasons...)
 
-	needsCleanupDecision := !(cand.MergedIntoDefault || cand.TreeMatchesDefault)
+	hasUniqueCommits := cand.UniqueAhead > 0
+	needsCleanupDecision := hasUniqueCommits
 	if needsCleanupDecision {
 		reasons = append(reasons, fmt.Sprintf("commits not merged into %s", cand.defaultBranch))
 		if openPRs := openPullRequests(cand.PRs); len(openPRs) > 0 {

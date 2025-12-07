@@ -6,7 +6,7 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 2  * [new branch]      squash-branch -> squash-branch
 1 Will clean up:
 1 - squash-branch (branch squash-branch)
-1     remove worktree /Users/bbloom/Projects/wt/squash/tmprepo/squash-branch
+1     remove worktree /Users/bbloom/Projects/wt/main/tmprepo/squash-branch
 1     delete local branch squash-branch
 1     delete remote branch origin/squash-branch
 1

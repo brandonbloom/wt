@@ -172,6 +172,32 @@ func HeadSameTree(dir, ref string) (bool, error) {
 	return true, nil
 }
 
+// UniqueCommitsComparedTo counts commits reachable from HEAD whose changes are
+// not present in the given ref (based on git-cherry's patch-id comparison).
+func UniqueCommitsComparedTo(dir, ref string) (int, error) {
+	if ref == "" {
+		return 0, nil
+	}
+	out, err := Run(dir, "cherry", ref, "HEAD")
+	if err != nil {
+		return 0, err
+	}
+	if strings.TrimSpace(out) == "" {
+		return 0, nil
+	}
+	count := 0
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "+") {
+			count++
+		}
+	}
+	return count, nil
+}
+
 // WorktreeOperation inspects git metadata to determine if a high-level operation is in progress.
 func WorktreeOperation(dir string) (string, error) {
 	gitDir, err := Run(dir, "rev-parse", "--git-dir")

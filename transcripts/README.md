@@ -4,16 +4,16 @@ This directory contains [transcript](https://github.com/deref/transcript) fixtur
 
 ## Workflow
 
-1. Record or update a session (no manual install required thanks to the Go `tool` directive):
+1. Record or update a session (the `transcript` CLI is preinstalled in the toolchain):
 
    ```bash
-   go tool github.com/deref/transcript shell -o transcripts/init.cmdt
+   transcript shell -o transcripts/init.cmdt
    ```
 
 2. Keep the fixtures up to date as commands evolve:
 
    ```bash
-   go tool github.com/deref/transcript check transcripts/*.cmdt
+   transcript check transcripts/*.cmdt
    ```
 
 Use `scripts/cleanup.sh tmprepo` (or another relative path) to drop temporary repos without tripping sandbox approvals.
@@ -22,7 +22,7 @@ The `context/transcript.md` guide in this repository dives deeper into the forma
 
 ## Test Harness
 
-`transcripts/entrypoint.sh` bootstraps a disposable wt project, stubs `gh`, and
+`transcripts/entrypoint.sh` bootstraps a disposable wt project, stubs `gh` (with canned responses so tests stay deterministic/offline), and
 optionally simulates the shell wrapper. Use it inside transcripts to avoid
 duplicating setup/teardown boilerplate:
 

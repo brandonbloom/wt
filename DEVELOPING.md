@@ -2,7 +2,7 @@
 
 ## Workflow
 
-- Read `context/spec.md` and keep `context/progress.md` up to date.
+- Read `context/spec.md` so changes stay grounded in the product brief.
 - The agent playbook lives in `AGENTS.md`; read it before automating changes.
 - User-facing CLI behavior should be covered by transcript fixtures in `transcripts/`.
 - Reset throwaway repos with `scripts/cleanup.sh <relative-path>` instead of direct `rm -rf`.
@@ -11,10 +11,10 @@
 
 ```bash
 mise run build        # go build -o bin/ ./cmd/wt with repo-local caches
-mise run test         # go test ./... && go tool github.com/deref/transcript check transcripts/*.cmdt
+mise run test         # go test ./... && transcript check transcripts/*.cmdt
 ```
 
-Use `bin/wt` for manual experiments. When recording CLI tests, follow `context/transcript.md`. Set `WT_NOW=<RFC3339>` when deterministic relative timestamps are needed (the transcripts rely on this).
+Use `bin/wt` for manual experiments. The `transcript` CLI is already on `$PATH`, so run `transcript shell`, `transcript update`, etc., directly when refreshing fixtures. When recording CLI tests, follow `context/transcript.md`. Set `WT_NOW=<RFC3339>` when deterministic relative timestamps are needed (the transcripts rely on this).
 
 ## Transcript Harness
 
@@ -33,4 +33,4 @@ healthy!
 - Keep `.wt/config` behavior documented in the README whenever it changes.
 - Run `wt doctor` (or `wt doctor --verbose`) after environment tweaks to ensure future users won’t hit regressions.
 
-Pull requests should mention any spec updates and link to the transcript changes that prove the behavior.***
+Pull requests should mention any spec updates and link to the transcript changes that prove the behavior.

@@ -100,8 +100,10 @@ fi
 
 cat >"${gh_state_file}" <<'EOF'
 demo-branch|42|OPEN|false|2000-01-02T00:00:00Z|https://example.com/pr/42
+merged-branch|99|MERGED|false|2000-01-02T00:00:00Z|https://example.com/pr/99
 EOF
 
+# Install a hermetic gh stub so transcript runs never hit real GitHub.
 mkdir -p bin
 cat >bin/gh <<'EOF'
 #!/bin/sh

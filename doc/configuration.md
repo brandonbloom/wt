@@ -1,0 +1,64 @@
+# wt Configuration Reference
+
+Configuration lives in `<project>/.wt/config.toml`, beside your worktrees but outside git so each machine can customize settings safely. This document explains every supported field.
+
+```toml
+default_branch = "main"
+
+[bootstrap]
+run = "mise run deps"
+# strict = false
+```
+
+## `default_branch`
+
+- Type: string.
+- Required: yes.
+- The name of the default branch (`main` or `master` for most repositories). `wt init` populates this value after validating it against GitHub’s default branch for the repository.
+- `wt doctor` re-validates the value periodically and fails if it diverges from GitHub, preventing surprises when new branches are created.
+- Commands that need a fallback branch (`wt new` without `--base`, dashboard comparisons, divergence badges) read this value, so keep it accurate.
+
+## `[bootstrap]` Table
+
+### `run`
+
+- Type: string (required).
+- Shell command that runs immediately after `wt new` creates and enters a worktree. Common tasks include installing dependencies or running project-specific setup scripts.
+- The command executes inside your default shell (`$SHELL`) with stdin/stdout/stderr attached so you can interact with prompts.
+- Failures abort `wt new` or `wt bootstrap` with a clear message so you can fix the issue before continuing.
+
+### `strict`
+
+- Type: boolean (optional, default `true`).
+- When omitted or set to `true`, the bootstrap command runs under `set -euo pipefail` for defensive shell semantics.
+- Set `strict = false` if your bootstrap command relies on lenient behavior.
+- `wt bootstrap` accepts `--strict` or `--no-strict` to override the configuration temporarily, plus `-x/--xtrace` to print commands before executing them. This is useful for troubleshooting flaky setups.
+
+## `[tidy]` Table
+
+Controls the default behavior of `wt tidy`. All keys are optional; the CLI falls back to built-in defaults when omitted.
+
+### `policy`
+
+- Type: string (`"safe"`, `"all"`, or `"prompt"`). Default: `"safe"`.
+- Mirrors the `--policy` flag. `"safe"` auto-cleans safe candidates and prompts for gray, `"all"` auto-cleans both, and `"prompt"` always asks before mutating anything.
+
+### `stale_days`
+
+- Type: integer (default `14`).
+- Branches whose last activity (max of worktree mtime, HEAD commit, or PR update) exceeds this age are marked gray so you can decide whether to delete them.
+
+### `divergence_commits`
+
+- Type: integer (default `20`).
+- Branches with more than this many commits ahead or behind the default branch become gray even if they are otherwise clean.
+
+## Editing Tips
+
+- Because `.wt/` is not part of git, edits affect only the local machine. Copy the file manually if you need to share settings.
+- Keep file permissions restrictive if secrets (such as API tokens) end up in custom bootstrap commands.
+- After editing `config.toml`, run `wt doctor` to confirm the file parses and the environment remains healthy.
+
+## Future Additions
+
+`wt` intentionally keeps configuration surface area small. If you need additional knobs, prefer adding flags to subcommands (documented in `wt --help`) so the config file stays reserved for long-lived project defaults.

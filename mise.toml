@@ -4,11 +4,15 @@ GOCACHE = "{{ cwd }}/.gocache"
 GOMODCACHE = "{{ cwd }}/.gopath"
 GOBIN = "{{ cwd }}/bin"
 
+[tools]
+go = "latest"
+"go:github.com/deref/transcript" = "latest"
+
 [tasks.build]
 run = "go build -o bin/ ./cmd/wt "
 
 [tasks.test]
 run = """
 go test ./...
-go tool github.com/deref/transcript check transcripts/*.cmdt
+transcript check transcripts/*.cmdt
 """

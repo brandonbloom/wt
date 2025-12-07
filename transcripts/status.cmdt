@@ -7,6 +7,9 @@ $ ./transcripts/entrypoint.sh bash -lc 'cd main && export PATH="$(pwd)/../bin:$P
 $ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new demo-branch --base main >/dev/null 2>&1 && cd ../demo-branch && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && ../../bin/wt'
 1 * demo-branch   demo-branch      2 days ago   (PR #42 open)   
 1   main          main             2 days ago   (PR: none)      
+$ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new merged-branch --base main >/dev/null 2>&1 && cd ../merged-branch && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && ../../bin/wt'
+1   main            main             2 days ago   (PR: none)      
+1 * merged-branch   merged-branch    2 days ago   (PR #99 merged) 
 $ ./transcripts/entrypoint.sh bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && script -q /dev/null ../../bin/wt | hexdump -C'
 2 warning: shell wrapper missing; add `eval "$(wt activate)"` to your shell rc
 1 00000000  5e 44 08 08 2a 20 6d 61  69 6e 20 20 20 6d 61 69  |^D..* main   mai|

@@ -40,8 +40,12 @@ Controls the default behavior of `wt tidy`. All keys are optional; the CLI falls
 
 ### `policy`
 
-- Type: string (`"safe"`, `"all"`, or `"prompt"`). Default: `"safe"`.
-- Mirrors the `--policy` flag. `"safe"` auto-cleans safe candidates and prompts for gray, `"all"` auto-cleans both, and `"prompt"` always asks before mutating anything.
+- Type: string (`"auto"`, `"safe"`, `"all"`, or `"prompt"`). Default: `"auto"`.
+- Mirrors the `--policy` flag:
+  - `"auto"` (default) cleans safe worktrees automatically and prompts only for gray ones.
+  - `"safe"` cleans safe worktrees and automatically declines gray ones (no prompts).
+  - `"all"` auto-cleans both safe and gray.
+  - `"prompt"` asks before touching anything, including clearly safe worktrees.
 
 ### `stale_days`
 

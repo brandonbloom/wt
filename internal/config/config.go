@@ -36,7 +36,7 @@ func (t *TidyBlock) applyDefaults() {
 		return
 	}
 	if t.Policy == "" {
-		t.Policy = "safe"
+		t.Policy = "auto"
 	} else {
 		t.Policy = strings.ToLower(t.Policy)
 	}
@@ -50,7 +50,7 @@ func (t *TidyBlock) applyDefaults() {
 
 func (t TidyBlock) Validate() error {
 	switch t.Policy {
-	case "safe", "all", "prompt":
+	case "auto", "safe", "all", "prompt":
 		return nil
 	default:
 		return ErrInvalidTidyPolicy
@@ -69,7 +69,7 @@ var (
 	// ErrMissingDefaultBranch indicates the config omitted the required branch.
 	ErrMissingDefaultBranch = errors.New("config.default_branch must be set")
 	// ErrInvalidTidyPolicy indicates the tidy policy is not recognized.
-	ErrInvalidTidyPolicy = errors.New("config.tidy.policy must be safe, all, or prompt")
+	ErrInvalidTidyPolicy = errors.New("config.tidy.policy must be auto, safe, all, or prompt")
 )
 
 // Default returns a baseline configuration for a project.

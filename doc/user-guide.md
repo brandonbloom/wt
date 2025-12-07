@@ -78,9 +78,8 @@ Cleanup (for safe items or approved gray ones) removes the worktree directory, d
 ### Flags & Policies
 
 - `-n, --dry-run` – Print the planned actions without mutating anything.
-- `--policy=<safe|all|prompt>` – Default `safe` auto-cleans safe items and prompts for gray; `prompt` asks before every cleanup; `all` auto-cleans safe and gray.
-- Shorthands: `--safe`/`-s`, `--all`/`-a`, and `--prompt` map to the policy values.
-- `--assume-no` – Reject every prompt automatically so automation can run with `--policy=safe` confidently.
+- `--policy=<auto|safe|all|prompt>` – `auto` (default) cleans safe worktrees automatically and prompts for gray ones; `safe` cleans safe worktrees and automatically declines gray ones (non-interactive); `prompt` asks before every cleanup (including safe); `all` auto-cleans safe and gray.
+- Shorthands: `--safe`/`-s`, `--all`/`-a`, and `--prompt`/`-p` map to the policy values so `wt tidy -s` becomes the non-interactive “only touch the obvious stuff” flow and `wt tidy -p` becomes the “ask about everything” flow.
 
 When prompting for gray candidates, `wt tidy` renders a mini status panel showing PR state, ahead/behind counts, divergence badge vs the default branch, last-activity timestamp (max of HEAD, PR updates, or worktree mtime), dirty indicators, stash presence, and any running processes that have their `cwd` inside the worktree. Answer `y` to proceed, `n` to skip, or Ctrl+C to cancel the whole command.
 

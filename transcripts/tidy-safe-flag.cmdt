@@ -1,0 +1,37 @@
+$ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new safe-branch --base main >/dev/null; cd ../safe-branch; echo safe >>README.md; git add README.md; git commit -m "safe change" >/dev/null; git push -u origin safe-branch >/dev/null; cd ../main; git merge safe-branch >/dev/null; ../../bin/wt new gray-branch --base main >/dev/null; cd ../gray-branch; echo gray >>README.md; git add README.md; git commit -m "gray change" >/dev/null; git push -u origin gray-branch >/dev/null; cd ../main; printf "%s\n" "safe-branch|101|OPEN|false|2000-01-10T00:00:00Z|https://example.com/pr/101" "gray-branch|102|OPEN|false|2000-01-15T00:00:00Z|https://example.com/pr/102" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt tidy --safe'
+2 To ../remote.git
+2  * [new branch]      main -> main
+2 Preparing worktree (new branch 'safe-branch')
+2 To ../remote.git
+2  * [new branch]      safe-branch -> safe-branch
+2 Preparing worktree (new branch 'gray-branch')
+2 To ../remote.git
+2  * [new branch]      gray-branch -> gray-branch
+1 Plan:
+1 Will clean up:
+1 - safe-branch (branch safe-branch)
+1     remove worktree /Users/bbloom/Projects/wt/main/tmprepo/safe-branch
+1     delete local branch safe-branch
+1     delete remote branch origin/safe-branch
+1     close PR #101
+1
+1 Will prompt for:
+1 - gray-branch (branch gray-branch)
+1     reasons:
+1       * commits not merged into main
+1       * PR #102 open
+1       * stale for 17 days
+1
+1
+1 Remote maintenance:
+1 - git remote prune origin
+1
+1 Skipped gray-branch: --policy=safe
+1 Cleaning safe-branch (branch safe-branch)
+1   removed worktree /Users/bbloom/Projects/wt/main/tmprepo/safe-branch
+1   deleted local branch safe-branch
+1 To ../remote.git
+1  - [deleted]         safe-branch
+1   deleted remote branch origin/safe-branch
+1   closed PR #101
+1 Pruned remote origin

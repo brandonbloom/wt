@@ -23,6 +23,7 @@ import (
 type tidyPolicy string
 
 const (
+	tidyPolicyAuto   tidyPolicy = "auto"
 	tidyPolicySafe   tidyPolicy = "safe"
 	tidyPolicyAll    tidyPolicy = "all"
 	tidyPolicyPrompt tidyPolicy = "prompt"
@@ -45,7 +46,6 @@ const blockReasonCurrentWorktree = "currently inside this worktree"
 
 type tidyOptions struct {
 	dryRun      bool
-	assumeNo    bool
 	policyFlag  string
 	safeAlias   bool
 	allAlias    bool
@@ -62,11 +62,10 @@ func newTidyCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVarP(&opts.dryRun, "dry-run", "n", false, "show actions without deleting anything")
-	cmd.Flags().BoolVar(&opts.assumeNo, "assume-no", false, "automatically decline every prompt")
-	cmd.Flags().StringVar(&opts.policyFlag, "policy", "", "tidy policy: safe (default), all, or prompt")
+	cmd.Flags().StringVar(&opts.policyFlag, "policy", "", "tidy policy: auto (default), safe, all, or prompt")
 	cmd.Flags().BoolVarP(&opts.safeAlias, "safe", "s", false, "alias for --policy safe")
 	cmd.Flags().BoolVarP(&opts.allAlias, "all", "a", false, "alias for --policy all")
-	cmd.Flags().BoolVar(&opts.promptAlias, "prompt", false, "alias for --policy prompt")
+	cmd.Flags().BoolVarP(&opts.promptAlias, "prompt", "p", false, "alias for --policy prompt")
 	return cmd
 }
 
@@ -121,7 +120,7 @@ func runTidy(cmd *cobra.Command, opts *tidyOptions) error {
 		fmt.Fprintln(cmd.OutOrStdout())
 	}
 
-	return executeTidies(cmd, proj, candidates, policy, opts.assumeNo, now, ui, initialWD)
+	return executeTidies(cmd, proj, candidates, policy, now, ui, initialWD)
 }
 
 func resolveTidyPolicy(opts *tidyOptions, defaultPolicy tidyPolicy) (tidyPolicy, error) {
@@ -150,10 +149,10 @@ func resolveTidyPolicy(opts *tidyOptions, defaultPolicy tidyPolicy) (tidyPolicy,
 	}
 
 	switch policy {
-	case tidyPolicySafe, tidyPolicyAll, tidyPolicyPrompt:
+	case tidyPolicyAuto, tidyPolicySafe, tidyPolicyAll, tidyPolicyPrompt:
 		return policy, nil
 	default:
-		return "", fmt.Errorf("unknown policy %q (expected safe, all, or prompt)", policy)
+		return "", fmt.Errorf("unknown policy %q (expected auto, safe, all, or prompt)", policy)
 	}
 }
 
@@ -510,7 +509,7 @@ func plannedActions(cand *tidyCandidate) []string {
 	return actions
 }
 
-func executeTidies(cmd *cobra.Command, proj *project.Project, candidates []*tidyCandidate, policy tidyPolicy, assumeNo bool, now time.Time, ui *tidyUI, initialWD string) error {
+func executeTidies(cmd *cobra.Command, proj *project.Project, candidates []*tidyCandidate, policy tidyPolicy, now time.Time, ui *tidyUI, initialWD string) error {
 	out := cmd.OutOrStdout()
 	reader := bufio.NewReader(cmd.InOrStdin())
 	logWriter := out
@@ -519,7 +518,7 @@ func executeTidies(cmd *cobra.Command, proj *project.Project, candidates []*tidy
 	}
 
 	var remoteTouched bool
-	var manualAssumeNo bool
+	var manualQuit bool
 	var relocated bool
 	for _, cand := range candidates {
 		switch cand.Classification {
@@ -532,7 +531,7 @@ func executeTidies(cmd *cobra.Command, proj *project.Project, candidates []*tidy
 			continue
 		}
 
-		if manualAssumeNo {
+		if manualQuit {
 			cand.Stage = tidyStageSkipped
 			ui.Update(cand)
 			if logWriter != nil {
@@ -541,16 +540,17 @@ func executeTidies(cmd *cobra.Command, proj *project.Project, candidates []*tidy
 			continue
 		}
 
+		if policy == tidyPolicySafe && cand.Classification == tidyGray {
+			cand.Stage = tidyStageSkipped
+			ui.Update(cand)
+			if logWriter != nil {
+				fmt.Fprintf(logWriter, "Skipped %s: --policy=safe\n", cand.Worktree.Name)
+			}
+			continue
+		}
+
 		prompt := shouldPrompt(cand.Classification, policy)
 		if prompt {
-			if assumeNo {
-				cand.Stage = tidyStageSkipped
-				ui.Update(cand)
-				if logWriter != nil {
-					fmt.Fprintf(logWriter, "Skipped %s: --assume-no\n", cand.Worktree.Name)
-				}
-				continue
-			}
 			proceed, quit, lines, err := promptForCandidate(out, reader, cand, now, ui.Interactive())
 			if ui.Interactive() {
 				ui.AddExtraLines(lines)
@@ -559,7 +559,7 @@ func executeTidies(cmd *cobra.Command, proj *project.Project, candidates []*tidy
 				return err
 			}
 			if quit {
-				manualAssumeNo = true
+				manualQuit = true
 			}
 			if !proceed {
 				cand.Stage = tidyStageSkipped
@@ -612,11 +612,13 @@ func shouldPrompt(class tidyClassification, policy tidyPolicy) bool {
 	case tidyPolicyAll:
 		return false
 	case tidyPolicySafe:
+		return false
+	case tidyPolicyAuto:
 		return class == tidyGray
 	case tidyPolicyPrompt:
 		return true
 	default:
-		return true
+		return class == tidyGray
 	}
 }
 

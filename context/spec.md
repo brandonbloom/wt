@@ -1,6 +1,7 @@
 # wt Specification (Draft)
 
 ## Project Overview
+
 - Repository: `github.com/brandonbloom/wt`
 - License: MIT
 - Implementation language: Go (using the Cobra CLI framework)
@@ -10,6 +11,7 @@
 - Logging/output: avoid timestamped loggers (e.g., Go’s default `log` package formatter) since the CLI should finish fast enough that timestamps add no value; stick to plain stdout/stderr messaging instead.
 
 ## Directory & Worktree Assumptions
+
 - A project that uses `wt` is converted into a directory containing multiple worktrees (e.g., `~/Projects/iaf` becomes `~/Projects/iaf/main`, `~/Projects/iaf/<other-worktree>`).
 - Exactly one “default” worktree must exist and be named `main` or `master` (checked in that order of preference). If both folders exist or neither folder exists (or if they are not valid git worktrees), the tool must exit with a clear error.
 - A `.wt/` directory lives alongside the worktrees (e.g., `~/Projects/iaf/.wt`) and is **not** part of the git repo, allowing machine- or user-specific configuration.
@@ -17,6 +19,7 @@
 - When invoked from inside `main`/`master` or any other worktree under the project directory, `wt` must still function. The dashboard should show a detailed view for the current tree plus summary data for the others.
 
 ## Initialization (`wt init`)
+
 - `wt init` creates the `.wt` directory and a template `config.toml` under the project root.
 - If run from within an existing git repository that has not yet been converted into the `project/{branch}` layout, the command must:
   - Determine the current project name and branch.
@@ -25,10 +28,12 @@
 - The generated config file must include the validated default branch name (matching GitHub’s default branch) and a stub `[bootstrap]` section (see below). `wt doctor` must verify that the configured default branch matches GitHub’s reported default.
 
 ## Cloning (`wt clone <url> [<dest>]`)
+
 - `wt clone` wraps `git clone`. After cloning into `<dest>` (or the Git default when omitted), it must run `wt init` inside the freshly cloned repository to install the `.wt` layout automatically.
 - Honor all `git clone` exit codes and surface failures clearly before attempting initialization.
 
 ## Configuration (`.wt/config.toml`)
+
 - Configuration lives at `<project>/.wt/config.toml` outside the repo so it need not be shared with collaborators.
 - File format: TOML. At minimum it contains:
   - `default_branch = "main"` (string) which must match the default branch reported by GitHub for the repository.
@@ -38,6 +43,7 @@
 - A dedicated `wt bootstrap` command reruns the configured bootstrap script within the current worktree, allowing users to reset dependencies or rerun setup later. It respects the `[bootstrap].strict` setting but also accepts `--strict`, `--no-strict`, and `-x/--xtrace` flags to temporarily override strict mode or enable shell tracing.
 
 ## Worktree Naming (`wt new`)
+
 - `wt new` creates a new git worktree rooted in the current project.
 - New worktree names must be short, memorable, distinct, and inoffensive.
 - Strategy: adjective–noun pairs chosen from hard-coded curated dictionaries (~100 safe words in each category).
@@ -49,6 +55,7 @@
 - After creation, the tool should change the shell’s working directory into the new worktree (accomplished via the shell wrapper described below).
 
 ## Shell Integration (`wt activate`)
+
 - Because a binary cannot directly change the caller’s `cwd`, the installed Go binary is named `wt` and emits shell code that defines a shell wrapper function (also named `wt`) which shadows the binary on `$PATH`.
 - Commands that need to `cd` (e.g., `wt new`) should fail politely when the wrapper is missing, but `wt`/`wt status` must proactively detect an inactive wrapper and emit installation guidance before rendering the dashboard.
 - `wt activate` is responsible for emitting the shell script that installs/updates the wrapper function. Users add `eval "$(wt activate)"` to their shell rc (zsh assumed, but solution should be shell-agnostic where possible).
@@ -56,6 +63,7 @@
 - Goal: allow commands like `wt new` to create a worktree and automatically `cd` into it through the evaluated shell function.
 
 ## Status Dashboard (`wt`)
+
 - Running `wt` with no subcommand prints a dashboard view of all worktrees, rendered as exactly one status line per worktree (current worktree line should include an additional marker/prefix to highlight it).
 - Before hitting git, `wt status` should perform lightweight “doctor-lite” checks (wrapper active, `.wt` discoverable, default worktree healthy) and surface any failures inline so users fix issues before reading stale data.
 - Required data per worktree:
@@ -72,6 +80,7 @@
   - Divergence from the configured default branch (e.g., `origin/main`) is shown inline via a short badge appended to the branch column, e.g., `[+5 -2]` when the worktree is five commits ahead and two commits behind the default branch. Omit the badge entirely when both counts are zero.
 
 ## Worktree Cleanup (`wt tidy`)
+
 - Purpose: prune finished or abandoned worktrees/branches so the project root stays manageable without losing work.
 - Safety classification:
 - **Safe** candidates satisfy the “nothing of value will be lost” rule: the worktree has no staged/unstaged changes, no stash entries, its HEAD (and therefore every unique commit) is already reachable from the configured default branch, `git status` is clean, and at most one GitHub pull request targets the branch. If an open PR exists but the commits already landed on the default branch, `wt tidy` treats it as safe and closes the PR as part of cleanup.
@@ -90,11 +99,14 @@
 - CLI ergonomics:
   - `wt tidy` defaults to scanning every non-default worktree. Flags include:
     - `-n, --dry-run`: never mutate anything; instead print “Will clean up:” followed by the per-worktree actions and “Will prompt for:” entries for gray candidates.
-    - `--policy=<safe|all|prompt>` where `safe` is the default. `safe` auto-cleans safe candidates and prompts for gray; `prompt` prompts even for safe ones; `all` auto-cleans both categories.
-    - Convenience aliases: `--safe`/`-s`, `--all`/`-a`, and `--prompt` map to their respective policy values.
-    - `--assume-no` (long-only) suppresses interactive prompts by automatically rejecting gray candidates; combine with `--policy=safe` to make the command non-interactive while still touching safe worktrees.
+    - `--policy=<auto|safe|all|prompt>` where `auto` is the default.
+      - `auto` automatically cleans safe candidates and prompts for gray ones.
+      - `safe` automatically cleans safe candidates and declines gray ones (no prompts). This is handy for CI or “just clean the obvious stuff” runs.
+      - `all` auto-cleans both safe and gray.
+      - `prompt` prompts for every candidate, including safe ones.
+    - Convenience aliases: `--safe`/`-s`, `--all`/`-a`, and `--prompt`/`-p` map to their respective policy values.
   - Prompts render a “mini status panel” for each gray candidate before requesting confirmation. The panel lists PR status, ahead/behind/divergence vs the default branch, last activity timestamp (max of HEAD commit time, PR update time, or worktree mtime), local dirty status, and whether a stash exists.
-  - While prompting, `y` proceeds with cleanup, `n` skips, and Ctrl+C aborts the entire run. `--assume-no` turns every prompt into an implicit “n” so automation can safely skip gray areas.
+  - While prompting, `y` proceeds with cleanup, `n` skips, and Ctrl+C aborts the entire run.
   - Output must match the status dashboard ergonomics: when stdout is an interactive TTY, render a live table that updates as data (git + GitHub) streams in, reusing the same column layout/renderer used by `wt status`; when stdout is not a TTY, emit a single non-interactive log with grouped sections (“Will clean up/Will prompt/Will skip”) plus progress updates for each worktree as it finishes.
   - Remote/GitHub fetches (PR metadata, other network calls) should kick off in parallel so the UI updates incrementally instead of blocking on each branch sequentially.
 - Gray classification heuristics (all configurable):
@@ -106,7 +118,7 @@
 - When `wt tidy` is invoked from inside a worktree that ultimately gets deleted, the command must automatically change directories back to the project root (or another surviving worktree) before removal so the user never loses their active shell.
 - Configuration:
   - `.wt/config.toml` grows a `[tidy]` section with the following keys (all optional):
-    - `policy = "safe"` sets the default policy (`safe`, `all`, or `prompt`).
+    - `policy = "auto"` sets the default policy (`auto`, `safe`, `all`, or `prompt`).
     - `stale_days = 14` controls the inactivity threshold in days.
     - `divergence_commits = 20` controls how many commits of ahead/behind drift marks a branch as gray.
   - Future knobs (e.g., remote name) should also live under `[tidy]`.
@@ -117,6 +129,7 @@
 - Cover the new command with transcript fixtures that demonstrate safe cleanup, gray prompting, dry-run output, and blocked cases.
 
 ## Targeted Removal (`wt rm`)
+
 - Purpose: delete one or more specific worktrees/branches/PRs in the same way `wt tidy` would, without scanning others.
 - Invocation: `wt rm [target ...]` where `target` is optional.
   - With no arguments, the command must be run from inside a non-default worktree; that worktree becomes the sole target and the command errors otherwise.
@@ -131,6 +144,7 @@
 - Document `wt rm` in the spec/README/DEVELOPING contexts alongside `wt tidy`, and cover the behavior with transcript tests (safe deletion, gray prompt, dry-run, blocked/forbidden cases, and forcing through gray).
 
 ## `wt doctor`
+
 - Purpose: verify the environment and installation so that all `wt` functionality will succeed (shell wrapper installed, directory layout valid, git state sane, etc.).
 - Checks must confirm required tooling is installed and usable, including git and the GitHub CLI (`gh`), that `gh` is authenticated and can reach GitHub, that the expected project directory layout is present (including a `.wt` directory discovered via the upward walk), that the configured `default_branch` matches GitHub’s default, and that the shell wrapper is installed.
 - Include a process-detection check on supported platforms that exercises the same discovery logic used by `wt status`/`wt tidy` (e.g., ensure the current process can be observed). Surfacing this via `wt doctor` helps users fix permission issues before other commands fail.
@@ -140,14 +154,17 @@
   - `wt doctor --verbose` lists each check and its result, even when passing.
 
 ## GitHub Integration
+
 - All GitHub data (e.g., PR status) should be obtained via the GitHub CLI (`gh`) to piggyback on its configuration/auth and avoid duplicating logic.
 - To associate a branch/worktree with PRs, use `gh pr list --head <branch>` (falling back to `gh pr list` if needed) and present the most relevant PR status when exactly one match exists; handle multiple matches or empty results explicitly.
 
 ## Error Handling Expectations
+
 - Every command must provide actionable error messages and avoid proceeding when validation could have caught a problem earlier.
 - When implementing new checks, consider whether `wt doctor` could have reported the issue proactively; if so, add or reference the corresponding doctor check so users can fix their environment before rerunning operational commands.
 
 ## Methodology & Testing
+
 - Follow strict TDD for all features. Write a failing unit or transcript test first, make it pass, and keep the suite green.
 - Use `git@github.com:brandonbloom/wt-playground.git` as the canonical repository for workflow testing, especially when exercising real worktree operations.
 - All user-facing CLI behavior (anything non-trivial to unit test) must be covered with [transcript](https://github.com/deref/transcript) `.cmdt` fixtures. Consult `context/transcript.md` in this repo for usage instructions.

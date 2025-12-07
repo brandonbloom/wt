@@ -27,3 +27,25 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 1
 1 Remote maintenance:
 1 - git remote prune origin
+
+$ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new safe-branch --base main >/dev/null; cd ../safe-branch; echo safe >>README.md; git add README.md; git commit -m "safe change" >/dev/null; git push -u origin safe-branch >/dev/null; cd ../main; git merge safe-branch >/dev/null; ../../bin/wt new gray-branch --base main >/dev/null; cd ../gray-branch; echo gray >>README.md; git add README.md; git commit -m "gray change" >/dev/null; git push -u origin gray-branch >/dev/null; cd ../main; printf '"'"'[{"pid":1234,"ppid":400,"command":"server","cwd":"%s/../safe-branch"}]\n'"'"' "$(pwd)" >processes.json; export PATH="$(pwd)/../bin:$PATH"; export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt tidy -n'
+2 To ../remote.git
+2  * [new branch]      main -> main
+2 Preparing worktree (new branch 'safe-branch')
+2 To ../remote.git
+2  * [new branch]      safe-branch -> safe-branch
+2 Preparing worktree (new branch 'gray-branch')
+2 To ../remote.git
+2  * [new branch]      gray-branch -> gray-branch
+1 Will prompt for:
+1 - gray-branch (branch gray-branch)
+1     reasons:
+1       * commits not merged into main
+1       * stale for 31 days
+1 - safe-branch (branch safe-branch)
+1     reasons:
+1       * processes running: server (1234)
+1
+1
+1 Remote maintenance:
+1 - git remote prune origin

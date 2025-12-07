@@ -70,7 +70,7 @@ Use this when dependencies drift or you need to reapply setup steps after `wt ne
 `wt tidy` prunes finished or abandoned worktrees/branches so the project root stays sane without losing work. The command categorizes each non-default worktree before acting:
 
 - **Safe** – Clean worktree/stash, commits already reachable from the default branch (or no unique commits), and at most one PR targeting the head. Safe items can be deleted without losing data.
-- **Gray** – Clean but requires human judgment (e.g., diverged more than the configured threshold, stale activity, unique commits not merged yet, or ambiguous PR state).
+- **Gray** – Clean but requires human judgment (e.g., diverged more than the configured threshold, stale activity, unique commits not merged yet, ambiguous PR state, or active processes still running inside the worktree).
 - **Blocked** – Local changes, stash entries, multiple worktrees per branch, or other situations that guarantee data loss. These are never touched; `wt tidy` prints guidance instead.
 
 Cleanup (for safe items or approved gray ones) removes the worktree directory, deletes the local and remote branches, closes the associated PR via `gh pr close --comment '...tidy...'`, and finally runs `git remote prune origin` once to drop stale refs.
@@ -82,7 +82,7 @@ Cleanup (for safe items or approved gray ones) removes the worktree directory, d
 - Shorthands: `--safe`/`-s`, `--all`/`-a`, and `--prompt` map to the policy values.
 - `--assume-no` – Reject every prompt automatically so automation can run with `--policy=safe` confidently.
 
-When prompting for gray candidates, `wt tidy` renders a mini status panel showing PR state, ahead/behind counts, divergence badge vs the default branch, last-activity timestamp (max of HEAD, PR updates, or worktree mtime), dirty indicators, and stash presence. Answer `y` to proceed, `n` to skip, or Ctrl+C to cancel the whole command.
+When prompting for gray candidates, `wt tidy` renders a mini status panel showing PR state, ahead/behind counts, divergence badge vs the default branch, last-activity timestamp (max of HEAD, PR updates, or worktree mtime), dirty indicators, stash presence, and any running processes that have their `cwd` inside the worktree. Answer `y` to proceed, `n` to skip, or Ctrl+C to cancel the whole command.
 
 `wt tidy` requires the GitHub CLI because closing PRs and inspecting their state is mandatory for cleanup.
 
@@ -94,9 +94,10 @@ The installed Go binary emits shell code when you run `wt activate`. Evaluating 
 
 Running `wt` with no subcommand prints a status dashboard:
 - Exactly one status line per worktree; the current worktree receives an additional highlight plus extended detail.
-- Each line shows branch name, ahead (`↑N`) / behind (`↓M`) counts relative to the worktree’s upstream, dirty indicators, and a divergence badge relative to the default branch. The badge uses `[+N -M]` and is omitted when both counts are zero.
+- Each line shows branch name (only when it differs from the worktree directory), ahead (`↑N`) / behind (`↓M`) counts relative to the worktree’s upstream, dirty indicators, and a divergence badge relative to the default branch. The badge uses `[+N -M]` and is omitted when both counts are zero.
 - Timestamps come from the newest dirty/staged file when the worktree has changes; otherwise they use the HEAD commit timestamp. Values render as friendly relative strings such as `3s ago`, `2 min ago`, or `yesterday 2pm`.
 - If the branch has an associated GitHub pull request, its status appears inline.
+- On macOS and Linux, the dashboard also lists processes owned by the current user whose `cwd` lives inside the worktree (subdirectories included). Entries render as `command (pid)` separated by commas with truncation when the column runs long. Unsupported platforms simply omit this summary.
 
 Before collecting git data, the dashboard performs quick “doctor-lite” checks (wrapper active, `.wt` present, default worktree healthy) and surfaces any issues so you’re not looking at stale information.
 

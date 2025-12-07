@@ -63,6 +63,7 @@
 - Timestamp derived as: newest file mtime when the worktree is dirty or has staged changes; otherwise use the HEAD commit timestamp. Display the timestamp as a friendly relative string (e.g., `3s ago`, `2 min ago`, `yesterday 2pm`, `4 days ago`) instead of raw ISO text.
   - If the branch has an associated GitHub pull request, display its status.
 - When run inside a specific worktree, highlight that worktree with additional detail while still summarizing the others.
+- Display a per-worktree summary of processes owned by the current user whose working directories (after resolving symlinks) live anywhere within that worktree. Format entries as `command (pid)` separated by commas, include at least three entries when available, and append `+ N more` when truncating to fit within roughly 80 columns. On macOS and Linux this data must be gathered via platform APIs (`/proc` on Linux, `sysctl`/`proc_pidpath` on macOS). Unsupported platforms may omit the column entirely, but supported platforms must fail the command if process discovery fails outright.
 - Output should respect the “silence is golden” philosophy where possible (e.g., avoid gratuitous chatter when nothing noteworthy changed).
 - Performance expectations: local info renders essentially instantly, even with dozens or a few hundred worktrees; remote/GitHub data may stream in afterward, showing placeholders such as “pending…” and respecting Ctrl+C to abort remote fetches. When attached to an interactive TTY, continuously re-render the status table in place so PR updates stream live without relying on external progress libraries. When stdout is not a TTY, emit a single non-interactive pass suitable for scripts.
 - Branch status must convey two perspectives without overwhelming the table:
@@ -97,6 +98,8 @@
   - More than 20 commits of divergence (ahead or behind) relative to the default branch marks the branch as gray even if it is otherwise clean, since the drift suggests abandonment.
   - Any open PR whose commits have not yet merged into the default branch is gray; `wt tidy` highlights the PR URL/status so the user can make the call.
   - Any branch with multiple PRs (reopened or duplicate heads) is gray because we cannot automatically determine which to close.
+- Worktrees that have active processes in their directory tree must be classified as gray even if they would otherwise be safe; the prompt should reuse the same per-worktree process summary rendered by `wt status`.
+- When `wt tidy` is invoked from inside a worktree that ultimately gets deleted, the command must automatically change directories back to the project root (or another surviving worktree) before removal so the user never loses their active shell.
 - Configuration:
   - `.wt/config.toml` grows a `[tidy]` section with the following keys (all optional):
     - `policy = "safe"` sets the default policy (`safe`, `all`, or `prompt`).
@@ -112,6 +115,7 @@
 ## `wt doctor`
 - Purpose: verify the environment and installation so that all `wt` functionality will succeed (shell wrapper installed, directory layout valid, git state sane, etc.).
 - Checks must confirm required tooling is installed and usable, including git and the GitHub CLI (`gh`), that `gh` is authenticated and can reach GitHub, that the expected project directory layout is present (including a `.wt` directory discovered via the upward walk), that the configured `default_branch` matches GitHub’s default, and that the shell wrapper is installed.
+- Include a process-detection check on supported platforms that exercises the same discovery logic used by `wt status`/`wt tidy` (e.g., ensure the current process can be observed). Surfacing this via `wt doctor` helps users fix permission issues before other commands fail.
 - Architecture: the actual checks should run opportunistically (cheap checks can run on every command), but reporting is separated.
   - Default behavior: only report problems (no news is good news).
   - `wt doctor` prints a positive confirmation (e.g., “healthy!”) when everything passes.

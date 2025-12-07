@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/brandonbloom/wt/internal/gitutil"
+	"github.com/brandonbloom/wt/internal/processes"
 	"github.com/brandonbloom/wt/internal/project"
 	"github.com/brandonbloom/wt/internal/shellbridge"
 	"github.com/brandonbloom/wt/internal/timefmt"
@@ -56,12 +57,28 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	for _, wt := range worktrees {
 		status, err := collectWorktreeStatus(wt, proj.Config.DefaultBranch)
 		if err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s: %s\n", wt.Name, singleLineError(err))
+			msg := singleLineError(err)
+			if friendly, ok := friendlyWorktreeGitError(wt.Name, err); ok {
+				msg = friendly
+			}
+			statuses = append(statuses, &worktreeStatus{
+				Name:      wt.Name,
+				Path:      wt.Path,
+				Branch:    wt.Name,
+				Timestamp: now,
+				PRStatus:  fmt.Sprintf("error: %s", msg),
+				Error:     msg,
+				HasError:  true,
+			})
 			continue
 		}
 		status.Current = wt.Name == current
-		status.PRStatus = "(PR: pending)"
+		status.PRStatus = "PR: pending"
 		statuses = append(statuses, status)
+	}
+
+	if err := attachProcessesToStatuses(statuses, worktrees); err != nil {
+		return err
 	}
 
 	sort.SliceStable(statuses, func(i, j int) bool {
@@ -72,55 +89,43 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	})
 
 	out := cmd.OutOrStdout()
-	termWidth, interactive := terminalWidth(out)
+	termWidth, isTTY := terminalWidth(out)
 	layout := buildColumnLayout(statuses, now, termWidth)
-	layout.useColor = interactive
-
-	var renderer *statusRenderer
-	if interactive {
-		renderer = newStatusRenderer(out)
-		if renderer == nil {
-			interactive = false
-			layout.useColor = false
-		} else {
-			renderer.Render(statuses, layout, now)
-		}
+	layout.useColor = isTTY
+	if os.Getenv("WT_DEBUG_STATUS") != "" {
+		fmt.Fprintf(cmd.ErrOrStderr(), "status debug: tty=%t rows=%d\n", isTTY, len(statuses))
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	err = fetchPullRequestStatuses(ctx, statuses, layout, renderer, now)
-	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			fmt.Fprintln(cmd.ErrOrStderr(), "warning: cancelled GitHub fetch")
-		} else {
-			fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s\n", singleLineError(err))
-		}
+	err = fetchPullRequestStatuses(ctx, statuses)
+	if err != nil && errors.Is(err, context.Canceled) {
+		fmt.Fprintln(cmd.ErrOrStderr(), "warning: cancelled GitHub fetch")
 	}
 
-	if !interactive {
-		printStatuses(out, statuses, now, layout)
-	} else if renderer != nil {
-		renderer.Render(statuses, layout, now)
-	}
+	printStatuses(out, statuses, now, layout)
 
 	return nil
 }
 
 type worktreeStatus struct {
-	Name       string
-	Path       string
-	Branch     string
-	Dirty      bool
-	Ahead      int
-	Behind     int
-	BaseAhead  int
-	BaseBehind int
-	Timestamp  time.Time
-	Current    bool
-	PRStatus   string
-	Operation  string
-	NeedsInput bool
+	Name        string
+	Path        string
+	Branch      string
+	Dirty       bool
+	Ahead       int
+	Behind      int
+	BaseAhead   int
+	BaseBehind  int
+	Timestamp   time.Time
+	Current     bool
+	PRStatus    string
+	Operation   string
+	NeedsInput  bool
+	Processes   []processes.Process
+	ProcessWarn bool
+	Error       string
+	HasError    bool
 }
 
 func collectWorktreeStatus(wt project.Worktree, defaultBranch string) (*worktreeStatus, error) {
@@ -172,16 +177,31 @@ func terminalWidth(w io.Writer) (int, bool) {
 		if term.IsTerminal(fd) {
 			width, _, err := term.GetSize(fd)
 			if err == nil && width > 0 {
+				if os.Getenv("WT_DEBUG_STATUS") != "" {
+					fmt.Fprintf(os.Stderr, "terminal width via term.GetSize: %d (tty)\n", width)
+				}
 				return width, true
 			}
 			if envWidth := envTerminalWidth(); envWidth > 0 {
+				if os.Getenv("WT_DEBUG_STATUS") != "" {
+					fmt.Fprintf(os.Stderr, "terminal width via $COLUMNS (tty fallback): %d\n", envWidth)
+				}
 				return envWidth, true
+			}
+			if os.Getenv("WT_DEBUG_STATUS") != "" {
+				fmt.Fprintln(os.Stderr, "terminal width: using default 80 (tty fallback)")
 			}
 			return 80, true
 		}
 	}
 	if envWidth := envTerminalWidth(); envWidth > 0 {
+		if os.Getenv("WT_DEBUG_STATUS") != "" {
+			fmt.Fprintf(os.Stderr, "terminal width via $COLUMNS (non-tty): %d\n", envWidth)
+		}
 		return envWidth, false
+	}
+	if os.Getenv("WT_DEBUG_STATUS") != "" {
+		fmt.Fprintln(os.Stderr, "terminal width unknown, using 0")
 	}
 	return 0, false
 }
@@ -195,20 +215,24 @@ func envTerminalWidth() int {
 	return 0
 }
 
-const columnGap = "   "
-const columnGapWidth = len(columnGap)
+const (
+	columnGap      = "   "
+	columnGapWidth = len(columnGap)
+)
 
-var columnMinWidths = [4]int{4, 14, 8, 16}
-var shrinkPriority = []int{3, 1, 0, 2}
+const statusColumnCount = 3
+
+var columnMinWidths = [statusColumnCount]int{24, 16, 24}
+var shrinkPriority = []int{2, 0, 1}
 
 type columnLayout struct {
-	widths   [4]int
-	useColor bool
+	widths         [statusColumnCount]int
+	useColor       bool
+	prDisplayWidth int
 }
 
 var (
 	colorNameCurrent    = color.New(color.FgBlue, color.Bold).SprintFunc()
-	colorNameDefault    = color.New(color.FgBlack).SprintFunc()
 	colorBranchDirty    = color.New(color.FgRed).SprintFunc()
 	colorBranchDiverged = color.New(color.FgMagenta).SprintFunc()
 	colorBranchClean    = color.New(color.FgHiBlack).SprintFunc()
@@ -219,6 +243,7 @@ var (
 	colorPRNone         = color.New(color.FgBlack, color.Faint).SprintFunc()
 	colorPRError        = color.New(color.FgRed).SprintFunc()
 	colorPROther        = color.New(color.FgCyan).SprintFunc()
+	colorPRProcessWarn  = color.New(color.FgHiRed, color.Bold).SprintFunc()
 )
 
 func (cl columnLayout) totalWidth() int {
@@ -233,33 +258,52 @@ func (cl columnLayout) totalWidth() int {
 }
 
 func buildColumnLayout(statuses []*worktreeStatus, now time.Time, maxWidth int) columnLayout {
-	var widths [4]int
+	var widths [statusColumnCount]int
+	var prBaseWidth int
+	mins := columnMinWidths
 	for _, status := range statuses {
-		fields := statusFields(status, now)
+		fields := statusFields(status, now, true, 0)
 		for i, field := range fields {
 			w := runewidth.StringWidth(field)
 			if w > widths[i] {
 				widths[i] = w
 			}
+			if i == 0 && w > mins[0] {
+				mins[0] = w
+			}
+			if i == statusColumnCount-1 && w > prBaseWidth {
+				prBaseWidth = w
+			}
 		}
 	}
-	for i, min := range columnMinWidths {
+	for i, min := range mins {
 		if widths[i] < min {
 			widths[i] = min
 		}
 	}
 	if maxWidth > 0 {
-		widths = shrinkWidths(widths, maxWidth)
+		widths = shrinkWidths(widths, mins, maxWidth)
 		layout := columnLayout{widths: widths}
 		total := layout.totalWidth()
 		if total < maxWidth {
 			widths[len(widths)-1] += maxWidth - total
 		}
+		layout.prDisplayWidth = widths[statusColumnCount-1]
+		return layout
 	}
-	return columnLayout{widths: widths}
+	if prBaseWidth == 0 {
+		prBaseWidth = widths[statusColumnCount-1]
+	}
+	if prBaseWidth < defaultProcessSummaryLimit {
+		prBaseWidth = defaultProcessSummaryLimit
+	}
+	if widths[statusColumnCount-1] < prBaseWidth {
+		widths[statusColumnCount-1] = prBaseWidth
+	}
+	return columnLayout{widths: widths, prDisplayWidth: prBaseWidth}
 }
 
-func shrinkWidths(widths [4]int, maxWidth int) [4]int {
+func shrinkWidths(widths [statusColumnCount]int, mins [statusColumnCount]int, maxWidth int) [statusColumnCount]int {
 	layout := columnLayout{widths: widths}
 	excess := layout.totalWidth() - maxWidth
 	if excess <= 0 {
@@ -268,7 +312,7 @@ func shrinkWidths(widths [4]int, maxWidth int) [4]int {
 	for excess > 0 {
 		shrunk := false
 		for _, idx := range shrinkPriority {
-			if widths[idx] > columnMinWidths[idx] {
+			if widths[idx] > mins[idx] {
 				widths[idx]--
 				excess--
 				shrunk = true
@@ -284,43 +328,65 @@ func shrinkWidths(widths [4]int, maxWidth int) [4]int {
 	return widths
 }
 
-func statusFields(status *worktreeStatus, now time.Time) [4]string {
+func statusFields(status *worktreeStatus, now time.Time, includeSummary bool, prWidth int) [statusColumnCount]string {
 	prefix := "  "
 	if status.Current {
 		prefix = "* "
 	}
-	branch := status.Branch
-	if status.Dirty {
-		branch += "!"
+	mergedPR := status.PRStatus != "" && strings.Contains(strings.ToLower(status.PRStatus), "merged")
+	branch := formatBranchStatus(status, !mergedPR)
+	nameField := fmt.Sprintf("%s%s", prefix, status.Name)
+	if branch != "" {
+		nameField = fmt.Sprintf("%s  %s", nameField, branch)
 	}
-	if status.Operation != "" {
-		branch = fmt.Sprintf("%s (%s)", branch, status.Operation)
+	relative := "-"
+	if !status.Timestamp.IsZero() {
+		relative = timefmt.Relative(status.Timestamp, now)
 	}
-	if delta := formatDelta(status.Ahead, status.Behind); delta != "" {
-		if branch != "" {
-			branch += " "
-		}
-		branch += delta
-	}
-	if status.PRStatus != "" && strings.Contains(strings.ToLower(status.PRStatus), "merged") {
-		// merged branches are expected to lag main; suppress base badge
-	} else if base := formatBaseDelta(status.BaseAhead, status.BaseBehind); base != "" {
-		if branch != "" {
-			branch += " "
-		}
-		branch += base
-	}
-	relative := timefmt.Relative(status.Timestamp, now)
 	pr := status.PRStatus
 	if pr == "" {
-		pr = "(PR: pending)"
+		pr = "PR: pending"
 	}
-	return [4]string{
-		fmt.Sprintf("%s%s", prefix, status.Name),
-		strings.TrimSpace(branch),
+	if includeSummary && !strings.Contains(strings.ToLower(pr), "processes running:") {
+		summary := summarizeProcesses(status.Processes, defaultProcessSummaryLimit)
+		pr = appendProcessSummary(pr, summary, prWidth)
+	}
+	return [statusColumnCount]string{
+		nameField,
 		relative,
 		pr,
 	}
+}
+
+func formatBranchStatus(status *worktreeStatus, includeBase bool) string {
+	branchName := strings.TrimSpace(status.Branch)
+	if branchName == "" {
+		branchName = "-"
+	}
+	showBranchName := branchName == "-" || !strings.EqualFold(branchName, status.Name)
+
+	parts := make([]string, 0, 5)
+	if showBranchName {
+		parts = append(parts, branchName)
+	}
+	if status.Dirty {
+		parts = append(parts, "dirty")
+	}
+	if status.Operation != "" {
+		parts = append(parts, fmt.Sprintf("(%s)", status.Operation))
+	}
+	if delta := formatDelta(status.Ahead, status.Behind); delta != "" {
+		parts = append(parts, delta)
+	}
+	if includeBase {
+		if base := formatBaseDelta(status.BaseAhead, status.BaseBehind); base != "" {
+			parts = append(parts, base)
+		}
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.Join(parts, " ")
 }
 
 func formatDelta(ahead, behind int) string {
@@ -346,6 +412,29 @@ func formatBaseDelta(ahead, behind int) string {
 		parts = append(parts, fmt.Sprintf("-%d", behind))
 	}
 	return fmt.Sprintf("[%s]", strings.Join(parts, " "))
+}
+
+func appendProcessSummary(pr, summary string, prWidth int) string {
+	if summary == "" || summary == "-" {
+		return pr
+	}
+	if prWidth <= 0 {
+		prWidth = defaultProcessSummaryLimit
+	}
+	sep := " · "
+	baseWidth := runewidth.StringWidth(pr)
+	sepWidth := runewidth.StringWidth(sep)
+	available := prWidth - baseWidth - sepWidth
+	if available <= 0 {
+		return pr
+	}
+	if runewidth.StringWidth(summary) > available {
+		if available <= 1 {
+			return pr
+		}
+		summary = runewidth.Truncate(summary, available, "…")
+	}
+	return pr + sep + summary
 }
 
 func padOrTrim(text string, width int) string {
@@ -378,7 +467,11 @@ func padOrTrim(text string, width int) string {
 }
 
 func formatStatusLine(status *worktreeStatus, now time.Time, layout columnLayout) string {
-	fields := statusFields(status, now)
+	prWidth := layout.prDisplayWidth
+	if prWidth <= 0 {
+		prWidth = defaultProcessSummaryLimit
+	}
+	fields := statusFields(status, now, true, prWidth)
 	parts := make([]string, len(fields))
 	for i, field := range fields {
 		parts[i] = padOrTrim(field, layout.widths[i])
@@ -428,14 +521,10 @@ func (r *statusRenderer) AddExtraLines(n int) {
 }
 
 func colorizeParts(parts []string, status *worktreeStatus) {
-	if status.Current {
-		parts[0] = colorNameCurrent(parts[0])
-	} else {
-		parts[0] = colorNameDefault(parts[0])
-	}
-
 	branchColor := colorBranchClean
 	switch {
+	case status.HasError:
+		branchColor = colorPRError
 	case status.Operation != "":
 		branchColor = colorOperation
 	case status.Dirty:
@@ -443,13 +532,22 @@ func colorizeParts(parts []string, status *worktreeStatus) {
 	case status.Ahead > 0 || status.Behind > 0:
 		branchColor = colorBranchDiverged
 	}
-	parts[1] = branchColor(parts[1])
-
-	parts[2] = colorTimeValue(parts[2])
-	parts[3] = choosePRColor(status)(parts[3])
+	if status.Current {
+		parts[0] = colorNameCurrent(parts[0])
+	} else {
+		parts[0] = branchColor(parts[0])
+	}
+	parts[1] = colorTimeValue(parts[1])
+	parts[2] = choosePRColor(status)(parts[2])
 }
 
 func choosePRColor(status *worktreeStatus) func(a ...interface{}) string {
+	if status.HasError {
+		return colorPRError
+	}
+	if status.ProcessWarn {
+		return colorPRProcessWarn
+	}
 	if status.NeedsInput {
 		return color.New(color.FgHiRed).SprintFunc()
 	}
@@ -482,7 +580,7 @@ func formatStatusLines(statuses []*worktreeStatus, now time.Time, layout columnL
 	return lines
 }
 
-func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus, layout columnLayout, renderer *statusRenderer, now time.Time) error {
+func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus) error {
 	if len(statuses) == 0 {
 		return nil
 	}
@@ -519,19 +617,17 @@ func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus, l
 			return ctx.Err()
 		case res, ok := <-results:
 			if !ok {
-				if renderer != nil {
-					renderer.Render(statuses, layout, now)
-				}
 				return combined
 			}
 			if res.err != nil {
-				res.status.PRStatus = "(PR: unavailable)"
+				msg := singleLineError(res.err)
+				if msg == "" {
+					msg = "error"
+				}
+				res.status.PRStatus = fmt.Sprintf("PR: unavailable (%s)", msg)
 				combined = errors.Join(combined, fmt.Errorf("%s: %w", res.status.Name, res.err))
 			} else {
 				res.status.PRStatus = res.pr
-			}
-			if renderer != nil {
-				renderer.Render(statuses, layout, now)
 			}
 		}
 	}
@@ -539,7 +635,7 @@ func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus, l
 
 func queryPullRequestStatus(ctx context.Context, dir, branch string) (string, error) {
 	if branch == "" {
-		return "(PR: none)", nil
+		return "PR: none", nil
 	}
 	cmd := exec.CommandContext(
 		ctx,
@@ -576,14 +672,14 @@ func queryPullRequestStatus(ctx context.Context, dir, branch string) (string, er
 	}
 	switch len(pulls) {
 	case 0:
-		return "(PR: none)", nil
+		return "PR: none", nil
 	case 1:
 		pr := pulls[0]
 		state := strings.ToLower(pr.State)
 		if pr.IsDraft && state == "open" {
 			state = "draft"
 		}
-		return fmt.Sprintf("(PR #%d %s)", pr.Number, state), nil
+		return fmt.Sprintf("PR #%d %s", pr.Number, state), nil
 	default:
 		// show the first two numbers to aid cleanup
 		nums := make([]string, 0, len(pulls))
@@ -593,7 +689,7 @@ func queryPullRequestStatus(ctx context.Context, dir, branch string) (string, er
 			}
 			nums = append(nums, fmt.Sprintf("#%d", pr.Number))
 		}
-		return fmt.Sprintf("(PR %s multiple)", strings.Join(nums, ", ")), nil
+		return fmt.Sprintf("PR %s multiple", strings.Join(nums, ", ")), nil
 	}
 }
 

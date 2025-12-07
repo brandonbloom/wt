@@ -30,13 +30,14 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 1 - git remote prune origin
 1
 1 Skipped dirty-branch: worktree has uncommitted changes
-1 
+1
 1 gray-branch (branch gray-branch)
 1 ----------------------------------------
 1   PR:            #102 open
 1   Divergence:    +2/-0 vs main
 1   Last activity: Jan 15
 1   Dirty/Stash:   no / no
+1   Processes:     -
 1   Worktree:      /Users/bbloom/Projects/wt/main/tmprepo/gray-branch
 1   Reasons:
 1     - commits not merged into main
@@ -98,6 +99,7 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 1   Divergence:    +2/-0 vs main
 1   Last activity: Jan 15
 1   Dirty/Stash:   no / no
+1   Processes:     -
 1   Worktree:      /Users/bbloom/Projects/wt/main/tmprepo/gray-branch
 1   Reasons:
 1     - commits not merged into main

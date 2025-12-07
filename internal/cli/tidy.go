@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/brandonbloom/wt/internal/gitutil"
+	"github.com/brandonbloom/wt/internal/processes"
 	"github.com/brandonbloom/wt/internal/project"
 	"github.com/brandonbloom/wt/internal/timefmt"
 	"github.com/fatih/color"
@@ -79,6 +80,11 @@ func runTidy(cmd *cobra.Command, opts *tidyOptions) error {
 		return err
 	}
 
+	initialWD, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
 	policy, err := resolveTidyPolicy(opts, tidyPolicy(proj.Config.Tidy.Policy))
 	if err != nil {
 		return err
@@ -87,6 +93,10 @@ func runTidy(cmd *cobra.Command, opts *tidyOptions) error {
 	now := currentTimeOverride()
 	candidates, err := collectTidyCandidates(cmd.Context(), proj, now)
 	if err != nil {
+		return err
+	}
+
+	if err := attachProcessesToCandidates(candidates); err != nil {
 		return err
 	}
 
@@ -111,7 +121,7 @@ func runTidy(cmd *cobra.Command, opts *tidyOptions) error {
 		fmt.Fprintln(cmd.OutOrStdout())
 	}
 
-	return executeTidies(cmd, proj, candidates, policy, opts.assumeNo, now, ui)
+	return executeTidies(cmd, proj, candidates, policy, opts.assumeNo, now, ui, initialWD)
 }
 
 func resolveTidyPolicy(opts *tidyOptions, defaultPolicy tidyPolicy) (tidyPolicy, error) {
@@ -171,6 +181,7 @@ type tidyCandidate struct {
 	staleCutoffDays     int
 	defaultBranch       string
 	status              *worktreeStatus
+	Processes           []processes.Process
 }
 
 type tidyClassification int
@@ -238,7 +249,8 @@ func inspectWorktreeBase(ctx context.Context, proj *project.Project, wt project.
 
 	branch, err := gitutil.CurrentBranch(wt.Path)
 	if err != nil {
-		return nil, err
+		cand.Branch = "(unknown)"
+		return markTidyGitError(cand, err)
 	}
 	cand.Branch = branch
 
@@ -256,7 +268,7 @@ func inspectWorktreeBase(ctx context.Context, proj *project.Project, wt project.
 
 	dirty, err := gitutil.Dirty(wt.Path)
 	if err != nil {
-		return nil, err
+		return markTidyGitError(cand, err)
 	}
 	cand.Dirty = dirty
 	if dirty {
@@ -265,7 +277,7 @@ func inspectWorktreeBase(ctx context.Context, proj *project.Project, wt project.
 
 	stash, err := gitutil.HasBranchStash(wt.Path, cand.Branch)
 	if err != nil {
-		return nil, err
+		return markTidyGitError(cand, err)
 	}
 	cand.HasStash = stash
 	if stash {
@@ -274,29 +286,29 @@ func inspectWorktreeBase(ctx context.Context, proj *project.Project, wt project.
 
 	cand.BaseAhead, cand.BaseBehind, err = gitutil.AheadBehindDefaultBranch(wt.Path, proj.Config.DefaultBranch)
 	if err != nil {
-		return nil, err
+		return markTidyGitError(cand, err)
 	}
 
 	headTime, err := gitutil.HeadTimestamp(wt.Path)
 	if err != nil {
-		return nil, err
+		return markTidyGitError(cand, err)
 	}
 	cand.LastActivity = headTime
 
 	headHash, err := gitutil.Run(wt.Path, "rev-parse", "HEAD")
 	if err != nil {
-		return nil, err
+		return markTidyGitError(cand, err)
 	}
 	cand.HeadHash = headHash
 
 	cand.MergedIntoDefault, err = gitutil.HeadMergedInto(wt.Path, proj.Config.DefaultBranch)
 	if err != nil {
-		return nil, err
+		return markTidyGitError(cand, err)
 	}
 
 	remoteHash, exists, err := gitutil.RemoteBranchHead(proj.DefaultWorktreePath, "origin", cand.Branch)
 	if err != nil {
-		return nil, err
+		return markTidyGitError(cand, err)
 	}
 	cand.HasRemoteBranch = exists
 	if exists {
@@ -310,6 +322,22 @@ func inspectWorktreeBase(ctx context.Context, proj *project.Project, wt project.
 		cand.Stage = tidyStageBlocked
 	}
 
+	return cand, nil
+}
+
+func markTidyGitError(cand *tidyCandidate, err error) (*tidyCandidate, error) {
+	msg := fmt.Sprintf("git error: %s", singleLineError(err))
+	if friendly, ok := friendlyWorktreeGitError(cand.Worktree.Name, err); ok {
+		msg = friendly
+	}
+	cand.BlockReasons = append(cand.BlockReasons, msg)
+	cand.Stage = tidyStageBlocked
+	if cand.Branch == "" {
+		cand.Branch = "(unknown)"
+	}
+	if cand.LastActivity.IsZero() {
+		cand.LastActivity = currentTimeOverride()
+	}
 	return cand, nil
 }
 
@@ -515,7 +543,7 @@ func plannedActions(cand *tidyCandidate) []string {
 	return actions
 }
 
-func executeTidies(cmd *cobra.Command, proj *project.Project, candidates []*tidyCandidate, policy tidyPolicy, assumeNo bool, now time.Time, ui *tidyUI) error {
+func executeTidies(cmd *cobra.Command, proj *project.Project, candidates []*tidyCandidate, policy tidyPolicy, assumeNo bool, now time.Time, ui *tidyUI, initialWD string) error {
 	out := cmd.OutOrStdout()
 	reader := bufio.NewReader(cmd.InOrStdin())
 	logWriter := out
@@ -525,6 +553,7 @@ func executeTidies(cmd *cobra.Command, proj *project.Project, candidates []*tidy
 
 	var remoteTouched bool
 	var manualAssumeNo bool
+	var relocated bool
 	for _, cand := range candidates {
 		switch cand.Classification {
 		case tidyBlocked:
@@ -577,6 +606,13 @@ func executeTidies(cmd *cobra.Command, proj *project.Project, candidates []*tidy
 				}
 				continue
 			}
+		}
+
+		if !relocated && initialWD != "" && isWithin(initialWD, cand.Worktree.Path) {
+			if err := os.Chdir(proj.Root); err != nil {
+				return err
+			}
+			relocated = true
 		}
 
 		cand.Stage = tidyStageCleaning
@@ -656,6 +692,7 @@ func promptForCandidate(out io.Writer, reader *bufio.Reader, cand *tidyCandidate
 	fmt.Fprintf(&b, "  %-14s %s\n", label("Divergence:"), value(divergence))
 	fmt.Fprintf(&b, "  %-14s %s\n", label("Last activity:"), value(timefmt.Relative(cand.LastActivity, now)))
 	fmt.Fprintf(&b, "  %-14s %s / %s\n", label("Dirty/Stash:"), boolValue(cand.Dirty), boolValue(cand.HasStash))
+	fmt.Fprintf(&b, "  %-14s %s\n", label("Processes:"), value(summarizeProcesses(cand.Processes, defaultProcessSummaryLimit)))
 	fmt.Fprintf(&b, "  %-14s %s\n", label("Worktree:"), value(cand.Worktree.Path))
 
 	if len(cand.GrayReasons) > 0 {
@@ -955,6 +992,9 @@ func populateStatusFromCandidate(cand *tidyCandidate, status *worktreeStatus, no
 	status.Operation = prOperationLabel(cand)
 	status.PRStatus = tidyActionLabel(cand)
 	status.NeedsInput = cand.Stage == tidyStagePrompt
+	status.Processes = append([]processes.Process(nil), cand.Processes...)
+	status.ProcessWarn = len(cand.Processes) > 0 && cand.Classification != tidySafe
+	status.HasError = cand.Stage == tidyStageBlocked || cand.Stage == tidyStageError
 }
 
 func prOperationLabel(cand *tidyCandidate) string {

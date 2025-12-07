@@ -1,30 +1,46 @@
-$ ./transcripts/entrypoint.sh bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && ../../bin/wt'
+$ ./transcripts/entrypoint.sh bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && printf '"'"'[{"pid":9001,"command":"codex","cwd":"%s"}]\n'"'"' "$(pwd)" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && ../../bin/wt'
 2 warning: shell wrapper missing; add `eval "$(wt activate)"` to your shell rc
-1 * main   main             2 days ago   (PR: none)      
-$ ./transcripts/entrypoint.sh bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && ../../bin/wt status'
+1 * main  dirty              just now           PR: none · codex (9001)                                                         
+
+$ ./transcripts/entrypoint.sh bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && printf '"'"'[{"pid":9001,"command":"codex","cwd":"%s"}]\n'"'"' "$(pwd)" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && ../../bin/wt status'
 2 warning: shell wrapper missing; add `eval "$(wt activate)"` to your shell rc
-1 * main   main             2 days ago   (PR: none)      
-$ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new demo-branch --base main >/dev/null 2>&1 && cd ../demo-branch && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && ../../bin/wt'
-1 * demo-branch   demo-branch      2 days ago   (PR #42 open)   
-1   main          main             2 days ago   (PR: none)      
-$ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new merged-branch --base main >/dev/null 2>&1 && cd ../merged-branch && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && ../../bin/wt'
-1   main            main             2 days ago   (PR: none)      
-1 * merged-branch   merged-branch    2 days ago   (PR #99 merged) 
-$ ./transcripts/entrypoint.sh bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && script -q /dev/null ../../bin/wt | hexdump -C'
+1 * main  dirty              just now           PR: none · codex (9001)                                                         
+
+$ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new demo-branch --base main >/dev/null 2>&1 && cd ../demo-branch && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && printf '"'"'[{"pid":9101,"command":"server","cwd":"%s"},{"pid":9202,"command":"editor","cwd":"%s"}]\n'"'"' "$(pwd)" "$(pwd)/../main" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && ../../bin/wt'
+1 * demo-branch  dirty       just now           PR #42 open · server (9101)                                                     
+1   main                     2 days ago         PR: none · editor (9202)                                                        
+
+$ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new merged-branch --base main >/dev/null 2>&1 && cd ../merged-branch && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && printf '"'"'[{"pid":9303,"command":"deploy","cwd":"%s"}]\n'"'"' "$(pwd)" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && ../../bin/wt'
+1 * merged-branch  dirty     just now           PR #99 merged · deploy (9303)                                                   
+1   main                     2 days ago         PR: none                                                                        
+
+$ ./transcripts/entrypoint.sh bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && printf '"'"'[{"pid":9141,"ppid":8000,"command":"hexdump","cwd":"%s"},{"pid":9142,"ppid":9141,"command":"script","cwd":"%s"},{"pid":9143,"ppid":9000,"command":"zsh","cwd":"%s"},{"pid":9144,"ppid":9143,"command":"zsh","cwd":"%s"}]\n'"'"' "$(pwd)" "$(pwd)" "$(pwd)" "$(pwd)" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && script -q /dev/null ../../bin/wt | hexdump -C'
 2 warning: shell wrapper missing; add `eval "$(wt activate)"` to your shell rc
-1 00000000  5e 44 08 08 2a 20 6d 61  69 6e 20 20 20 6d 61 69  |^D..* main   mai|
-1 00000010  6e 20 20 20 20 20 20 20  20 20 20 20 20 20 32 20  |n             2 |
-1 00000020  64 61 79 73 20 61 67 6f  20 20 20 28 50 52 3a 20  |days ago   (PR: |
-1 00000030  6e 6f 6e 65 29 20 20 20  20 20 20 0a              |none)      .|
-1 0000003c
-$ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new demo-branch --base main >/dev/null 2>&1 && cd ../demo-branch && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && script -q /dev/null ../../bin/wt | hexdump -C'
+1 00000000  5e 44 08 08 2a 20 6d 61  69 6e 20 20 64 69 72 74  |^D..* main  dirt|
+1 00000010  79 20 20 20 20 20 20 20  20 20 20 20 20 20 20 6a  |y              j|
+1 00000020  75 73 74 20 6e 6f 77 20  20 20 20 20 20 20 20 20  |ust now         |
+1 00000030  20 20 50 52 3a 20 6e 6f  6e 65 20 c2 b7 20 68 65  |  PR: none .. he|
+1 00000040  78 64 75 6d 70 20 28 39  31 34 31 29 2c 20 73 63  |xdump (9141), sc|
+1 00000050  72 69 70 74 20 28 39 31  34 32 29 2c 20 7a 73 68  |ript (9142), zsh|
+1 00000060  20 28 39 31 34 33 29 20  20 20 20 20 20 20 20 20  | (9143)         |
+1 00000070  20 20 20 20 20 20 20 20  20 20 20 20 20 20 20 20  |                |
+1 00000080  20 20 20 0a                                       |   .|
+1 00000084
+$ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new demo-branch --base main >/dev/null 2>&1 && cd ../demo-branch && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && printf '"'"'[{"pid":9151,"ppid":8300,"command":"demo","cwd":"%s"},{"pid":9152,"ppid":9151,"command":"hexdump","cwd":"%s"},{"pid":9153,"ppid":9151,"command":"script","cwd":"%s"},{"pid":9154,"ppid":8400,"command":"zsh","cwd":"%s"},{"pid":9155,"ppid":8500,"command":"main-wt","cwd":"%s"}]\n'"'"' "$(pwd)" "$(pwd)" "$(pwd)" "$(pwd)" "$(pwd)/../main" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && script -q /dev/null ../../bin/wt | hexdump -C'
 1 00000000  5e 44 08 08 2a 20 64 65  6d 6f 2d 62 72 61 6e 63  |^D..* demo-branc|
-1 00000010  68 20 20 20 64 65 6d 6f  2d 62 72 61 6e 63 68 20  |h   demo-branch |
-1 00000020  20 20 20 20 20 32 20 64  61 79 73 20 61 67 6f 20  |     2 days ago |
-1 00000030  20 20 28 50 52 20 23 34  32 20 6f 70 65 6e 29 20  |  (PR #42 open) |
-1 00000040  20 20 0a 20 20 6d 61 69  6e 20 20 20 20 20 20 20  |  .  main       |
-1 00000050  20 20 20 6d 61 69 6e 20  20 20 20 20 20 20 20 20  |   main         |
-1 00000060  20 20 20 20 32 20 64 61  79 73 20 61 67 6f 20 20  |    2 days ago  |
-1 00000070  20 28 50 52 3a 20 6e 6f  6e 65 29 20 20 20 20 20  | (PR: none)     |
-1 00000080  20 0a                                             | .|
-1 00000082
+1 00000010  68 20 20 64 69 72 74 79  20 20 20 20 20 20 20 6a  |h  dirty       j|
+1 00000020  75 73 74 20 6e 6f 77 20  20 20 20 20 20 20 20 20  |ust now         |
+1 00000030  20 20 50 52 20 23 34 32  20 6f 70 65 6e 20 c2 b7  |  PR #42 open ..|
+1 00000040  20 64 65 6d 6f 20 28 39  31 35 31 29 2c 20 68 65  | demo (9151), he|
+1 00000050  78 64 75 6d 70 20 28 39  31 35 32 29 2c 20 73 63  |xdump (9152), sc|
+1 00000060  72 69 70 74 20 28 39 31  35 33 29 2c 20 7a 73 68  |ript (9153), zsh|
+1 00000070  20 28 39 31 35 34 29 20  20 20 20 20 20 20 20 20  | (9154)         |
+1 00000080  20 20 20 0a 20 20 6d 61  69 6e 20 20 20 20 20 20  |   .  main      |
+1 00000090  20 20 20 20 20 20 20 20  20 20 20 20 20 20 20 32  |               2|
+1 000000a0  20 64 61 79 73 20 61 67  6f 20 20 20 20 20 20 20  | days ago       |
+1 000000b0  20 20 50 52 3a 20 6e 6f  6e 65 20 c2 b7 20 6d 61  |  PR: none .. ma|
+1 000000c0  69 6e 2d 77 74 20 28 39  31 35 35 29 20 20 20 20  |in-wt (9155)    |
+1 000000d0  20 20 20 20 20 20 20 20  20 20 20 20 20 20 20 20  |                |
+1 *
+1 00000100  20 20 20 0a                                       |   .|
+1 00000104

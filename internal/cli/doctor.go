@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/brandonbloom/wt/internal/processes"
 	"github.com/brandonbloom/wt/internal/project"
 	"github.com/brandonbloom/wt/internal/shellbridge"
 	"github.com/spf13/cobra"
@@ -57,6 +58,7 @@ func runDoctor(cmd *cobra.Command, verbose bool) error {
 			}
 			return nil
 		}},
+		{Name: "process detection available", Fn: checkProcessDetection},
 	}
 
 	var failures []string
@@ -117,4 +119,21 @@ func checkDefaultBranch(ctx *doctorContext) error {
 		return fmt.Errorf("config default_branch=%s but GitHub reports %s", want, got)
 	}
 	return nil
+}
+
+func checkProcessDetection(*doctorContext) error {
+	procs, err := listProcesses()
+	if errors.Is(err, processes.ErrUnsupported) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	pid := os.Getpid()
+	for _, proc := range procs {
+		if proc.PID == pid {
+			return nil
+		}
+	}
+	return errors.New("process scanner unavailable (could not observe wt)")
 }

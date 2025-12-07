@@ -4,6 +4,13 @@ My opinionated, personal worktree manager.
 
 If you're not me, you probably don't want to use this.
 
+## Features
+
+- **Multi-worktree dashboard** – Live status of all branches, PRs, dirty state, and running processes in one view
+- **GitHub integration** – Automatic PR status sync and branch validation
+- **Safe worktree cleanup** – Intelligently identifies merged/stale worktrees without losing work
+- **Zero setup** – Clone any repo and get full worktree management instantly
+
 ## Quick Start
 
 ```bash

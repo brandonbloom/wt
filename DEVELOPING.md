@@ -5,6 +5,7 @@
 - Read `context/spec.md` so changes stay grounded in the product brief.
 - The agent playbook lives in `AGENTS.md`; read it before automating changes.
 - User-facing CLI behavior should be covered by transcript fixtures in `transcripts/`.
+- `wt rm` shares the `wt tidy` safety heuristics; keep their implementations and docs in sync (rm only exposes `-n/--dry-run` and `-f/--force`).
 - Reset throwaway repos with `scripts/cleanup.sh <relative-path>` instead of direct `rm -rf`.
 
 ## Building & Testing

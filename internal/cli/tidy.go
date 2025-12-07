@@ -43,6 +43,8 @@ const (
 	tidyStageError    tidyStage = "error"
 )
 
+const blockReasonCurrentWorktree = "currently inside this worktree"
+
 type tidyOptions struct {
 	dryRun      bool
 	assumeNo    bool
@@ -263,7 +265,7 @@ func inspectWorktreeBase(ctx context.Context, proj *project.Project, wt project.
 
 	cand.IsCurrent = isWithin(wd, wt.Path)
 	if cand.IsCurrent {
-		cand.BlockReasons = append(cand.BlockReasons, "currently inside this worktree")
+		cand.BlockReasons = append(cand.BlockReasons, blockReasonCurrentWorktree)
 	}
 
 	dirty, err := gitutil.Dirty(wt.Path)

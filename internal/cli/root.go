@@ -26,6 +26,7 @@ func newRootCommand() *cobra.Command {
 		newActivateCommand(),
 		newDoctorCommand(),
 		newTidyCommand(),
+		newRmCommand(),
 	)
 
 	return cmd

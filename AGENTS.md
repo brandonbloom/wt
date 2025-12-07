@@ -8,3 +8,4 @@
 - Build whenever the user is going to use the binary, as `./bin/wt` is symlinked globally, so that the user can test in other directories.
 - Follow strict TDD with failing tests first (unit or transcript) before implementing behavior.
 - The primary user prefers light themes. Selected colors should be readable on a white-background terminal.
+- Part of implementing new features is documenting them correctly in the user guide and references. If the new feature affects the every-day-use or getting-started experience, ask the user about updating the main README.md as well.

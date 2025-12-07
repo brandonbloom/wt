@@ -86,6 +86,32 @@ When prompting for gray candidates, `wt tidy` renders a mini status panel showin
 
 `wt tidy` requires the GitHub CLI because closing PRs and inspecting their state is mandatory for cleanup.
 
+### Targeted Removal (`wt rm`)
+
+`wt rm` applies the same safety rules as `wt tidy`, but only to specific worktrees instead of scanning everything. It’s handy when you already know which branches need to go:
+
+```bash
+# Remove the current worktree (must not be main/master).
+wt rm
+
+# Remove a couple of specific worktrees by name.
+wt rm feature-123 bugfix-alpha
+
+# Paths also work; wt resolves them to their containing worktrees.
+wt rm ../demo-branch /path/to/project/foo
+```
+
+Key behaviors:
+- Names are resolved before paths, and duplicates are ignored so each target is handled once in the order you provided.
+- The command refuses to touch the default worktree (`main`/`master`) and errors if you pass a detached HEAD, dirty tree, shared branch, or other blocked state—forcing does not override safety.
+- Each target inherits the safe/gray classification logic from `wt tidy`. Safe worktrees delete immediately; gray ones prompt with the same mini status panel unless you pass `-f/--force`.
+- Flags:
+  - `-n, --dry-run` – Show the planned actions (including per-target reasons and whether remote pruning is needed) without mutating anything.
+  - `-f, --force` – Skip prompts for gray worktrees. Blocked targets still refuse to run.
+- When you run `wt rm` from inside a worktree that gets deleted, the command instructs the wrapper to `cd` back to the project root first. If the wrapper isn’t active you’ll see a message reminding you to change directories manually.
+
+Cleanup steps mirror `wt tidy`: remove the worktree directory, delete the local branch, delete the remote branch if its tip still matches, close any open PRs through `gh`, and run `git remote prune origin` once if at least one remote ref was removed.
+
 ## Shell Integration
 
 The installed Go binary emits shell code when you run `wt activate`. Evaluating the output defines a shell function (also named `wt`) that proxies to the binary and applies directory changes requested by subcommands such as `wt new`. The root command (`wt` or `wt status`) also detects when the wrapper is missing and prints instructions before doing other work.

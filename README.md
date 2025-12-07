@@ -34,6 +34,7 @@ $EDITOR .wt/config.toml
 wt new      # spin up a fresh worktree (auto-runs bootstrap)
 wt status   # review every worktree + PR state
 wt tidy     # prune finished branches/worktrees/etc
+wt rm foo   # remove a specific worktree (use -n/-f as needed)
 ```
 
 ## Documentation

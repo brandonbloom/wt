@@ -438,12 +438,25 @@ func deriveClassification(cand *tidyCandidate, now time.Time) {
 	reasons = append(reasons, cand.extraGrayReasons...)
 
 	hasUniqueCommits := cand.UniqueAhead > 0
+	openPRs := openPullRequests(cand.PRs)
 	needsCleanupDecision := hasUniqueCommits
 	if needsCleanupDecision {
 		reasons = append(reasons, fmt.Sprintf("commits not merged into %s", cand.defaultBranch))
-		if openPRs := openPullRequests(cand.PRs); len(openPRs) > 0 {
+		if len(openPRs) > 0 {
 			for _, pr := range openPRs {
 				reasons = append(reasons, fmt.Sprintf("PR #%d open", pr.Number))
+			}
+		} else if len(cand.PRs) > 0 {
+			pr := cand.PRs[0]
+			state := strings.ToLower(pr.State)
+			label := "new commits pending"
+			switch state {
+			case "merged":
+				reasons = append(reasons, fmt.Sprintf("PR #%d merged; %s", pr.Number, label))
+			case "closed":
+				reasons = append(reasons, fmt.Sprintf("PR #%d closed; %s", pr.Number, label))
+			default:
+				reasons = append(reasons, fmt.Sprintf("PR #%d %s; %s", pr.Number, state, label))
 			}
 		}
 		if cand.divergenceThreshold > 0 {
@@ -1056,11 +1069,12 @@ func describePRSummary(cand *tidyCandidate) string {
 	if cand.UniqueAhead == 0 && !cand.Dirty && !cand.HasStash {
 		return "none"
 	}
-	if len(cand.PRs) == 0 {
+	active := openPullRequests(cand.PRs)
+	if len(active) == 0 {
 		return "none"
 	}
-	parts := make([]string, 0, len(cand.PRs))
-	for _, pr := range cand.PRs {
+	parts := make([]string, 0, len(active))
+	for _, pr := range active {
 		state := strings.ToLower(pr.State)
 		if pr.IsDraft && state == "open" {
 			state = "draft"

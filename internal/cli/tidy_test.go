@@ -23,7 +23,7 @@ func TestDescribePRSummaryShowsPRsWhenUniqueCommitsRemain(t *testing.T) {
 	cand := &tidyCandidate{
 		UniqueAhead: 1,
 		PRs: []pullRequestInfo{
-			{Number: 92, State: "MERGED"},
+			{Number: 92, State: "OPEN"},
 		},
 	}
 	got := describePRSummary(cand)

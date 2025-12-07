@@ -10,8 +10,8 @@ $ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PAT
 1 * demo-branch  dirty       just now           PR #42 open · server (9101)                                                     
 1   main                     2 days ago         PR: none · editor (9202)                                                        
 
-$ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new merged-branch --base main >/dev/null 2>&1 && cd ../merged-branch && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && printf '"'"'[{"pid":9303,"command":"deploy","cwd":"%s"}]\n'"'"' "$(pwd)" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && ../../bin/wt'
-1 * merged-branch  dirty     just now           PR #99 merged · deploy (9303)                                                   
+$ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new merged-branch --base main >/dev/null 2>&1 && cd ../merged-branch && echo merged >>README.md && git add README.md && git commit -m "merged work" >/dev/null && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && printf '"'"'[{"pid":9303,"command":"deploy","cwd":"%s"}]\n'"'"' "$(pwd)" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && ../../bin/wt'
+1 * merged-branch  dirty     just now           PR #99 merged; new commits pending · deploy (9303)                              
 1   main                     2 days ago         PR: none                                                                        
 
 $ ./transcripts/entrypoint.sh bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && printf '"'"'[{"pid":9141,"ppid":8000,"command":"hexdump","cwd":"%s"},{"pid":9142,"ppid":9141,"command":"script","cwd":"%s"},{"pid":9143,"ppid":9000,"command":"zsh","cwd":"%s"},{"pid":9144,"ppid":9143,"command":"zsh","cwd":"%s"}]\n'"'"' "$(pwd)" "$(pwd)" "$(pwd)" "$(pwd)" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && script -q /dev/null ../../bin/wt | hexdump -C'
@@ -44,3 +44,7 @@ $ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PAT
 1 *
 1 00000100  20 20 20 0a                                       |   .|
 1 00000104
+
+$ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new solo-branch --base main >/dev/null 2>&1 && cd ../solo-branch && echo solo >>README.md && git add README.md && git commit -m "solo change" >/dev/null && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-04T00:00:00Z" && printf '"'"'[{"pid":9404,"command":"solo","cwd":"%s"}]\n'"'"' "$(pwd)" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && ../../bin/wt'
+1 * solo-branch  dirty       just now           PR: no PR · solo (9404)                                                         
+1   main                     3 days ago         PR: none                                                                        

@@ -41,6 +41,7 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 1 - gray-branch (branch gray-branch)
 1     reasons:
 1       * commits not merged into main
+1       * no PR
 1       * stale for 31 days
 1 - safe-branch (branch safe-branch)
 1     reasons:

@@ -1,14 +1,11 @@
 package cli
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"os/signal"
 	"sort"
 	"strconv"
@@ -16,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/brandonbloom/wt/internal/gitutil"
 	"github.com/brandonbloom/wt/internal/processes"
 	"github.com/brandonbloom/wt/internal/project"
 	"github.com/brandonbloom/wt/internal/shellbridge"
@@ -55,7 +51,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	now := currentTimeOverride()
 	statuses := make([]*worktreeStatus, 0, len(worktrees))
 	for _, wt := range worktrees {
-		status, err := collectWorktreeStatus(wt, proj.Config.DefaultBranch)
+		status, err := collectWorktreeStatus(proj, wt)
 		if err != nil {
 			msg := singleLineError(err)
 			if friendly, ok := friendlyWorktreeGitError(wt.Name, err); ok {
@@ -109,65 +105,53 @@ func runStatus(cmd *cobra.Command, args []string) error {
 }
 
 type worktreeStatus struct {
-	Name        string
-	Path        string
-	Branch      string
-	Dirty       bool
-	Ahead       int
-	Behind      int
-	BaseAhead   int
-	BaseBehind  int
-	Timestamp   time.Time
-	Current     bool
-	PRStatus    string
-	Operation   string
-	NeedsInput  bool
-	Processes   []processes.Process
-	ProcessWarn bool
-	Error       string
-	HasError    bool
+	Name           string
+	Path           string
+	Branch         string
+	Dirty          bool
+	HasStash       bool
+	Ahead          int
+	Behind         int
+	BaseAhead      int
+	BaseBehind     int
+	UniqueAhead    int
+	Timestamp      time.Time
+	Current        bool
+	PRStatus       string
+	Operation      string
+	NeedsInput     bool
+	Processes      []processes.Process
+	ProcessWarn    bool
+	Error          string
+	HasError       bool
+	HasPendingWork bool
 }
 
-func collectWorktreeStatus(wt project.Worktree, defaultBranch string) (*worktreeStatus, error) {
-	branch, err := gitutil.CurrentBranch(wt.Path)
+func collectWorktreeStatus(proj *project.Project, wt project.Worktree) (*worktreeStatus, error) {
+	data, err := gatherWorktreeGitData(proj, wt)
 	if err != nil {
 		return nil, err
 	}
-	dirty, err := gitutil.Dirty(wt.Path)
-	if err != nil {
-		return nil, err
+	status := &worktreeStatus{
+		Name:        wt.Name,
+		Path:        wt.Path,
+		Branch:      data.Branch,
+		Dirty:       data.Dirty,
+		HasStash:    data.HasStash,
+		Ahead:       data.Ahead,
+		Behind:      data.Behind,
+		BaseAhead:   data.BaseAhead,
+		BaseBehind:  data.BaseBehind,
+		UniqueAhead: data.UniqueAhead,
+		Timestamp:   data.Timestamp,
+		Operation:   data.Operation,
 	}
-	operation, _ := gitutil.WorktreeOperation(wt.Path)
-	ahead, behind, err := gitutil.AheadBehind(wt.Path, branch)
-	if err != nil {
-		if operation == "" && !isDetachedHeadError(err) {
-			return nil, err
-		}
-		ahead, behind = 0, 0
-	}
-	ts, err := gitutil.HeadTimestamp(wt.Path)
-	if err != nil {
-		return nil, err
-	}
-	if dirty {
-		if dirtyTS, derr := gitutil.LatestDirtyTimestamp(wt.Path); derr == nil {
-			ts = dirtyTS
-		}
-	}
-	baseAhead, baseBehind, _ := gitutil.AheadBehindDefaultBranch(wt.Path, defaultBranch)
+	status.HasPendingWork = hasPendingWork(status.Dirty, status.HasStash, status.UniqueAhead)
+	return status, nil
+}
 
-	return &worktreeStatus{
-		Name:       wt.Name,
-		Path:       wt.Path,
-		Branch:     branch,
-		Dirty:      dirty,
-		Ahead:      ahead,
-		Behind:     behind,
-		BaseAhead:  baseAhead,
-		BaseBehind: baseBehind,
-		Timestamp:  ts,
-		Operation:  operation,
-	}, nil
+func hasPendingWork(dirty bool, hasStash bool, uniqueAhead int) bool {
+	return dirty || hasStash || uniqueAhead > 0
 }
 
 func terminalWidth(w io.Writer) (int, bool) {
@@ -587,7 +571,7 @@ func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus) e
 
 	type prResult struct {
 		status *worktreeStatus
-		pr     string
+		prs    []pullRequestInfo
 		err    error
 	}
 
@@ -598,11 +582,11 @@ func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus) e
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			prStatus, err := queryPullRequestStatus(ctx, status.Path, status.Branch)
+			prs, err := queryPullRequests(ctx, status.Path, status.Branch)
 			if errors.Is(err, context.Canceled) {
 				return
 			}
-			results <- prResult{status: status, pr: prStatus, err: err}
+			results <- prResult{status: status, prs: prs, err: err}
 		}()
 	}
 	go func() {
@@ -626,70 +610,14 @@ func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus) e
 				}
 				res.status.PRStatus = fmt.Sprintf("PR: unavailable (%s)", msg)
 				combined = errors.Join(combined, fmt.Errorf("%s: %w", res.status.Name, res.err))
-			} else {
-				res.status.PRStatus = res.pr
+				continue
 			}
+			summary := summarizePullRequestState(prContext{
+				HasPendingWork:   res.status.HasPendingWork,
+				HasUniqueCommits: res.status.UniqueAhead > 0,
+			}, res.prs)
+			res.status.PRStatus = summary.Column
 		}
-	}
-}
-
-func queryPullRequestStatus(ctx context.Context, dir, branch string) (string, error) {
-	if branch == "" {
-		return "PR: none", nil
-	}
-	cmd := exec.CommandContext(
-		ctx,
-		"gh",
-		"pr",
-		"list",
-		"--head", branch,
-		"--state", "all",
-		"--limit", "2",
-		"--json", "number,state,isDraft",
-	)
-	cmd.Dir = dir
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		if ctx.Err() != nil {
-			return "", ctx.Err()
-		}
-		msg := strings.TrimSpace(stderr.String())
-		if msg == "" {
-			msg = err.Error()
-		}
-		return "", fmt.Errorf("gh pr list: %s", msg)
-	}
-
-	var pulls []struct {
-		Number  int    `json:"number"`
-		State   string `json:"state"`
-		IsDraft bool   `json:"isDraft"`
-	}
-	if err := json.Unmarshal(stdout.Bytes(), &pulls); err != nil {
-		return "", err
-	}
-	switch len(pulls) {
-	case 0:
-		return "PR: none", nil
-	case 1:
-		pr := pulls[0]
-		state := strings.ToLower(pr.State)
-		if pr.IsDraft && state == "open" {
-			state = "draft"
-		}
-		return fmt.Sprintf("PR #%d %s", pr.Number, state), nil
-	default:
-		// show the first two numbers to aid cleanup
-		nums := make([]string, 0, len(pulls))
-		for i, pr := range pulls {
-			if i >= 3 {
-				break
-			}
-			nums = append(nums, fmt.Sprintf("#%d", pr.Number))
-		}
-		return fmt.Sprintf("PR %s multiple", strings.Join(nums, ", ")), nil
 	}
 }
 

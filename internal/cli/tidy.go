@@ -3,7 +3,6 @@ package cli
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/brandonbloom/wt/internal/gitutil"
 	"github.com/brandonbloom/wt/internal/processes"
 	"github.com/brandonbloom/wt/internal/project"
 	"github.com/brandonbloom/wt/internal/timefmt"
@@ -188,6 +186,13 @@ type tidyCandidate struct {
 	Processes           []processes.Process
 }
 
+func (cand *tidyCandidate) hasPendingWork() bool {
+	if cand == nil {
+		return false
+	}
+	return hasPendingWork(cand.Dirty, cand.HasStash, cand.UniqueAhead)
+}
+
 type tidyClassification int
 
 const (
@@ -195,19 +200,6 @@ const (
 	tidySafe
 	tidyGray
 )
-
-type pullRequestInfo struct {
-	Number    int
-	State     string
-	IsDraft   bool
-	UpdatedAt time.Time
-	URL       string
-}
-
-func (pr pullRequestInfo) Open() bool {
-	state := strings.ToLower(pr.State)
-	return state == "open"
-}
 
 func collectTidyCandidates(ctx context.Context, proj *project.Project, now time.Time) ([]*tidyCandidate, error) {
 	worktrees, err := project.ListWorktrees(proj.Root)
@@ -251,17 +243,17 @@ func inspectWorktreeBase(ctx context.Context, proj *project.Project, wt project.
 		defaultBranch: proj.Config.DefaultBranch,
 	}
 
-	branch, err := gitutil.CurrentBranch(wt.Path)
+	data, err := gatherWorktreeGitData(proj, wt)
 	if err != nil {
 		cand.Branch = "(unknown)"
 		return markTidyGitError(cand, err)
 	}
-	cand.Branch = branch
+	cand.Branch = data.Branch
 
-	if branch == "" || branch == "HEAD" {
+	if cand.Branch == "" || cand.Branch == "HEAD" {
 		cand.BlockReasons = append(cand.BlockReasons, "detached HEAD")
 	}
-	if branch == proj.Config.DefaultBranch {
+	if cand.Branch == proj.Config.DefaultBranch {
 		cand.BlockReasons = append(cand.BlockReasons, fmt.Sprintf("branch is the default (%s)", proj.Config.DefaultBranch))
 	}
 
@@ -270,64 +262,25 @@ func inspectWorktreeBase(ctx context.Context, proj *project.Project, wt project.
 		cand.BlockReasons = append(cand.BlockReasons, blockReasonCurrentWorktree)
 	}
 
-	dirty, err := gitutil.Dirty(wt.Path)
-	if err != nil {
-		return markTidyGitError(cand, err)
-	}
-	cand.Dirty = dirty
-	if dirty {
+	cand.Dirty = data.Dirty
+	if cand.Dirty {
 		cand.BlockReasons = append(cand.BlockReasons, "worktree has uncommitted changes")
 	}
 
-	stash, err := gitutil.HasBranchStash(wt.Path, cand.Branch)
-	if err != nil {
-		return markTidyGitError(cand, err)
-	}
-	cand.HasStash = stash
-	if stash {
+	cand.HasStash = data.HasStash
+	if cand.HasStash {
 		cand.BlockReasons = append(cand.BlockReasons, "stash entries reference this branch")
 	}
 
-	cand.BaseAhead, cand.BaseBehind, err = gitutil.AheadBehindDefaultBranch(wt.Path, proj.Config.DefaultBranch)
-	if err != nil {
-		return markTidyGitError(cand, err)
-	}
-
-	headTime, err := gitutil.HeadTimestamp(wt.Path)
-	if err != nil {
-		return markTidyGitError(cand, err)
-	}
-	cand.LastActivity = headTime
-
-	headHash, err := gitutil.Run(wt.Path, "rev-parse", "HEAD")
-	if err != nil {
-		return markTidyGitError(cand, err)
-	}
-	cand.HeadHash = headHash
-
-	cand.MergedIntoDefault, err = gitutil.HeadMergedInto(wt.Path, proj.Config.DefaultBranch)
-	if err != nil {
-		return markTidyGitError(cand, err)
-	}
-
-	cand.TreeMatchesDefault, err = gitutil.HeadSameTree(wt.Path, proj.Config.DefaultBranch)
-	if err != nil {
-		return markTidyGitError(cand, err)
-	}
-
-	cand.UniqueAhead, err = gitutil.UniqueCommitsComparedTo(wt.Path, proj.Config.DefaultBranch)
-	if err != nil {
-		return markTidyGitError(cand, err)
-	}
-
-	remoteHash, exists, err := gitutil.RemoteBranchHead(proj.DefaultWorktreePath, "origin", cand.Branch)
-	if err != nil {
-		return markTidyGitError(cand, err)
-	}
-	cand.HasRemoteBranch = exists
-	if exists {
-		cand.RemoteMatchesHead = remoteHash == cand.HeadHash
-	}
+	cand.BaseAhead = data.BaseAhead
+	cand.BaseBehind = data.BaseBehind
+	cand.LastActivity = data.Timestamp
+	cand.HeadHash = data.HeadHash
+	cand.MergedIntoDefault = data.MergedIntoDefault
+	cand.TreeMatchesDefault = data.TreeMatchesDefault
+	cand.UniqueAhead = data.UniqueAhead
+	cand.HasRemoteBranch = data.HasRemoteBranch
+	cand.RemoteMatchesHead = data.RemoteMatchesHead
 
 	cand.divergenceThreshold = proj.Config.Tidy.DivergenceCommits
 	cand.staleCutoffDays = proj.Config.Tidy.StaleDays
@@ -444,19 +397,15 @@ func deriveClassification(cand *tidyCandidate, now time.Time) {
 		reasons = append(reasons, fmt.Sprintf("commits not merged into %s", cand.defaultBranch))
 		if len(openPRs) > 0 {
 			for _, pr := range openPRs {
-				reasons = append(reasons, fmt.Sprintf("PR #%d open", pr.Number))
+				reasons = append(reasons, fmt.Sprintf("PR #%d %s", pr.Number, formatPRState(pr)))
 			}
-		} else if len(cand.PRs) > 0 {
-			pr := cand.PRs[0]
-			state := strings.ToLower(pr.State)
-			label := "new commits pending"
-			switch state {
-			case "merged":
-				reasons = append(reasons, fmt.Sprintf("PR #%d merged; %s", pr.Number, label))
-			case "closed":
-				reasons = append(reasons, fmt.Sprintf("PR #%d closed; %s", pr.Number, label))
-			default:
-				reasons = append(reasons, fmt.Sprintf("PR #%d %s; %s", pr.Number, state, label))
+		} else {
+			summary := summarizePullRequestState(prContext{
+				HasPendingWork:   cand.hasPendingWork(),
+				HasUniqueCommits: cand.UniqueAhead > 0,
+			}, cand.PRs)
+			if summary.Reason != "" {
+				reasons = append(reasons, summary.Reason)
 			}
 		}
 		if cand.divergenceThreshold > 0 {
@@ -496,16 +445,6 @@ func deriveClassification(cand *tidyCandidate, now time.Time) {
 		cand.Classification = tidyGray
 		cand.Stage = tidyStagePrompt
 	}
-}
-
-func openPullRequests(prs []pullRequestInfo) []pullRequestInfo {
-	var open []pullRequestInfo
-	for _, pr := range prs {
-		if pr.Open() {
-			open = append(open, pr)
-		}
-	}
-	return open
 }
 
 func renderDryRun(out io.Writer, safe, gray, blocked []*tidyCandidate, now time.Time) error {
@@ -892,57 +831,6 @@ func closePullRequest(ctx context.Context, dir, branch string, number int) error
 	return nil
 }
 
-func queryPullRequests(ctx context.Context, dir, branch string) ([]pullRequestInfo, error) {
-	if branch == "" {
-		return nil, nil
-	}
-	cmd := exec.CommandContext(
-		ctx,
-		"gh",
-		"pr",
-		"list",
-		"--head", branch,
-		"--state", "all",
-		"--limit", "5",
-		"--json", "number,state,isDraft,updatedAt,url",
-	)
-	cmd.Dir = dir
-	var stdout, stderr strings.Builder
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		msg := strings.TrimSpace(stderr.String())
-		if msg == "" {
-			msg = err.Error()
-		}
-		return nil, fmt.Errorf("gh pr list: %s", msg)
-	}
-
-	var raw []struct {
-		Number    int    `json:"number"`
-		State     string `json:"state"`
-		IsDraft   bool   `json:"isDraft"`
-		UpdatedAt string `json:"updatedAt"`
-		URL       string `json:"url"`
-	}
-	if err := json.Unmarshal([]byte(stdout.String()), &raw); err != nil {
-		return nil, err
-	}
-
-	prs := make([]pullRequestInfo, 0, len(raw))
-	for _, pr := range raw {
-		t, _ := time.Parse(time.RFC3339, pr.UpdatedAt)
-		prs = append(prs, pullRequestInfo{
-			Number:    pr.Number,
-			State:     pr.State,
-			IsDraft:   pr.IsDraft,
-			UpdatedAt: t,
-			URL:       pr.URL,
-		})
-	}
-	return prs, nil
-}
-
 type tidyUI struct {
 	interactive bool
 	renderer    *statusRenderer
@@ -1014,23 +902,22 @@ func populateStatusFromCandidate(cand *tidyCandidate, status *worktreeStatus, no
 	status.Name = cand.Worktree.Name
 	status.Branch = cand.Branch
 	status.Dirty = cand.Dirty
+	status.HasStash = cand.HasStash
 	status.BaseAhead = cand.BaseAhead
 	status.BaseBehind = cand.BaseBehind
+	status.UniqueAhead = cand.UniqueAhead
 	status.Timestamp = cand.LastActivity
-	status.Operation = prOperationLabel(cand)
+	status.HasPendingWork = cand.hasPendingWork()
+	summary := summarizePullRequestState(prContext{
+		HasPendingWork:   status.HasPendingWork,
+		HasUniqueCommits: cand.UniqueAhead > 0,
+	}, cand.PRs)
+	status.Operation = summary.Operation
 	status.PRStatus = tidyActionLabel(cand)
 	status.NeedsInput = cand.Stage == tidyStagePrompt
 	status.Processes = append([]processes.Process(nil), cand.Processes...)
 	status.ProcessWarn = len(cand.Processes) > 0 && cand.Classification != tidySafe
 	status.HasError = cand.Stage == tidyStageBlocked || cand.Stage == tidyStageError
-}
-
-func prOperationLabel(cand *tidyCandidate) string {
-	summary := describePRSummary(cand)
-	if summary == "none" {
-		return ""
-	}
-	return "PR " + summary
 }
 
 func tidyActionLabel(cand *tidyCandidate) string {

@@ -156,6 +156,22 @@ func HeadMergedInto(dir, ref string) (bool, error) {
 	return true, nil
 }
 
+// HeadSameTree reports whether HEAD has the same tree as the given ref.
+func HeadSameTree(dir, ref string) (bool, error) {
+	if ref == "" {
+		return false, nil
+	}
+	cmd := exec.Command("git", "-C", dir, "diff", "--quiet", "HEAD", ref, "--")
+	if err := cmd.Run(); err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
 // WorktreeOperation inspects git metadata to determine if a high-level operation is in progress.
 func WorktreeOperation(dir string) (string, error) {
 	gitDir, err := Run(dir, "rev-parse", "--git-dir")

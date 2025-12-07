@@ -46,6 +46,16 @@ func TestSummarizeProcessesBasics(t *testing.T) {
 			limit:    40,
 			expected: "codex (10), emacs (20), node (30), + 1 more",
 		},
+		{
+			name: "groupsMatchingCommands",
+			procs: []processes.Process{
+				{PID: 12694, Command: "/Applications/Code"},
+				{PID: 12710, Command: "/Applications/Code --inspect"},
+				{PID: 65338, Command: "/Applications/Code Helper"},
+				{PID: 90000, Command: "/usr/bin/python"},
+			},
+			expected: "Code (12694, 12710, 65338), python (90000)",
+		},
 	}
 
 	for _, tc := range cases {

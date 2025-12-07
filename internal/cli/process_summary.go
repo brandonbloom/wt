@@ -23,6 +23,11 @@ func summarizeProcesses(procs []processes.Process, limit int) string {
 		limit = defaultProcessSummaryLimit
 	}
 
+	type summaryEntry struct {
+		label string
+		pids  []int
+	}
+
 	sorted := append([]processes.Process(nil), procs...)
 	sort.Slice(sorted, func(i, j int) bool {
 		ci := processCommandLabel(sorted[i].Command)
@@ -33,9 +38,22 @@ func summarizeProcesses(procs []processes.Process, limit int) string {
 		return ci < cj
 	})
 
-	entries := make([]string, len(sorted))
-	for i, proc := range sorted {
-		entries[i] = fmt.Sprintf("%s (%d)", processCommandLabel(proc.Command), proc.PID)
+	grouped := make([]summaryEntry, 0, len(sorted))
+	for _, proc := range sorted {
+		label := processCommandLabel(proc.Command)
+		if len(grouped) > 0 && grouped[len(grouped)-1].label == label {
+			grouped[len(grouped)-1].pids = append(grouped[len(grouped)-1].pids, proc.PID)
+			continue
+		}
+		grouped = append(grouped, summaryEntry{
+			label: label,
+			pids:  []int{proc.PID},
+		})
+	}
+
+	entries := make([]string, len(grouped))
+	for i, entry := range grouped {
+		entries[i] = fmt.Sprintf("%s (%s)", entry.label, joinPIDs(entry.pids))
 	}
 
 	required := minProcessSummaryEntries
@@ -86,4 +104,15 @@ func processCommandLabel(cmd string) string {
 	cmd = fields[0]
 	cmd = filepath.Base(cmd)
 	return cmd
+}
+
+func joinPIDs(pids []int) string {
+	var b strings.Builder
+	for i, pid := range pids {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(fmt.Sprintf("%d", pid))
+	}
+	return b.String()
 }

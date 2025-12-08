@@ -106,8 +106,9 @@
       - `all` auto-cleans both safe and gray.
       - `prompt` prompts for every candidate, including safe ones.
     - Convenience aliases: `--safe`/`-s`, `--all`/`-a`, and `--prompt`/`-p` map to their respective policy values.
-  - Prompts render a “mini status panel” for each gray candidate before requesting confirmation. The panel lists PR status, ahead/behind/divergence vs the default branch, last activity timestamp (max of HEAD commit time, PR update time, or worktree mtime), local dirty status, and whether a stash exists.
-  - While prompting, `y` proceeds with cleanup, `n` skips, and Ctrl+C aborts the entire run.
+- Prompts render a “mini status panel” for each gray candidate before requesting confirmation. The panel lists PR status, ahead/behind/divergence vs the default branch, last activity timestamp (max of HEAD commit time, PR update time, or worktree mtime), local dirty status, and whether a stash exists.
+- When the prompt panel is shown on an interactive TTY and the worktree is classified as gray with commits ahead of the default branch, immediately below the divergence line display up to roughly ten lines of `git log --oneline --graph --decorate` output for the commits that would be discarded (`git log <branch> --not <default>`). This inline graph keeps the operator from cd’ing into the worktree to remember what the branch contains. Skip this snippet for non-interactive runs, safe candidates, or branches with no ahead commits.
+- While prompting, `y` proceeds with cleanup, `n` skips, and Ctrl+C aborts the entire run.
   - Output must match the status dashboard ergonomics: when stdout is an interactive TTY, render a live table that updates as data (git + GitHub) streams in, reusing the same column layout/renderer used by `wt status`; when stdout is not a TTY, emit a single non-interactive log with grouped sections (“Will clean up/Will prompt/Will skip”) plus progress updates for each worktree as it finishes.
   - Remote/GitHub fetches (PR metadata, other network calls) should kick off in parallel so the UI updates incrementally instead of blocking on each branch sequentially.
 - Gray classification heuristics (all configurable):

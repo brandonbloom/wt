@@ -47,6 +47,8 @@ const (
 
 const blockReasonCurrentWorktree = "currently inside this worktree"
 
+const tidyPromptLogLimit = 10
+
 type tidyOptions struct {
 	dryRun      bool
 	policyFlag  string
@@ -780,6 +782,25 @@ func promptForCandidate(out io.Writer, reader *bufio.Reader, cand *tidyCandidate
 	fmt.Fprintf(&b, "  %-14s %s\n", label("PR:"), value(describePRSummary(cand)))
 	divergence := fmt.Sprintf("+%d/-%d vs %s", cand.BaseAhead, cand.BaseBehind, cand.defaultBranch)
 	fmt.Fprintf(&b, "  %-14s %s\n", label("Divergence:"), value(divergence))
+	if useColor && cand.Classification == tidyGray && cand.BaseAhead > 0 {
+		graph, err := promptCommitGraph(cand)
+		logLabel := label("Recent commits:")
+		switch {
+		case err != nil:
+			msg := fmt.Sprintf("unavailable (%s)", singleLineError(err))
+			fmt.Fprintf(&b, "  %-14s %s\n", logLabel, value(msg))
+		case strings.TrimSpace(graph) == "":
+			fmt.Fprintf(&b, "  %-14s %s\n", logLabel, value("none"))
+		default:
+			fmt.Fprintf(&b, "  %-14s\n", logLabel)
+			for _, line := range strings.Split(graph, "\n") {
+				if line == "" {
+					continue
+				}
+				fmt.Fprintf(&b, "    %s\n", line)
+			}
+		}
+	}
 	fmt.Fprintf(&b, "  %-14s %s\n", label("Last activity:"), value(timefmt.Relative(cand.LastActivity, now)))
 	fmt.Fprintf(&b, "  %-14s %s / %s\n", label("Dirty/Stash:"), boolValue(cand.Dirty), boolValue(cand.HasStash))
 	fmt.Fprintf(&b, "  %-14s %s\n", label("Processes:"), value(summarizeProcesses(cand.Processes, defaultProcessSummaryLimit)))
@@ -832,6 +853,27 @@ func promptDivider(titleLen int) string {
 		width = 80
 	}
 	return strings.Repeat("-", width)
+}
+
+func promptCommitGraph(cand *tidyCandidate) (string, error) {
+	if cand == nil || cand.Worktree.Path == "" || cand.Branch == "" || cand.defaultBranch == "" {
+		return "", nil
+	}
+	args := []string{
+		"log",
+		"--oneline",
+		"--graph",
+		"--decorate",
+		fmt.Sprintf("--max-count=%d", tidyPromptLogLimit),
+		cand.Branch,
+		"--not",
+		cand.defaultBranch,
+	}
+	out, err := runGitCapture(cand.Worktree.Path, nil, args...)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimRight(out, "\n"), nil
 }
 
 var (

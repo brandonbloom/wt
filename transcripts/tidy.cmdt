@@ -11,7 +11,7 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 1 Plan:
 1 Will clean up:
 1 - safe-branch (branch safe-branch)
-1     remove worktree /Users/bbloom/Projects/wt/main/tmprepo/safe-branch
+1     remove worktree /tmp/wt-transcripts/tmprepo/safe-branch
 1     delete local branch safe-branch
 1     delete remote branch origin/safe-branch
 1     close PR #101
@@ -38,21 +38,21 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 1   Last activity: Jan 15
 1   Dirty/Stash:   no / no
 1   Processes:     -
-1   Worktree:      /Users/bbloom/Projects/wt/main/tmprepo/gray-branch
+1   Worktree:      /tmp/wt-transcripts/tmprepo/gray-branch
 1   Reasons:
 1     - commits not merged into main
 1     - PR #102 open
 1     - stale for 17 days
 1 Proceed with cleanup? [y/N/q]: 
 1 Cleaning gray-branch (branch gray-branch)
-1   removed worktree /Users/bbloom/Projects/wt/main/tmprepo/gray-branch
+1   removed worktree /tmp/wt-transcripts/tmprepo/gray-branch
 1   deleted local branch gray-branch
 1 To ../remote.git
 1  - [deleted]         gray-branch
 1   deleted remote branch origin/gray-branch
 1   closed PR #102
 1 Cleaning safe-branch (branch safe-branch)
-1   removed worktree /Users/bbloom/Projects/wt/main/tmprepo/safe-branch
+1   removed worktree /tmp/wt-transcripts/tmprepo/safe-branch
 1   deleted local branch safe-branch
 1 To ../remote.git
 1  - [deleted]         safe-branch
@@ -73,7 +73,7 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 1 Plan:
 1 Will clean up:
 1 - safe-branch (branch safe-branch)
-1     remove worktree /Users/bbloom/Projects/wt/main/tmprepo/safe-branch
+1     remove worktree /tmp/wt-transcripts/tmprepo/safe-branch
 1     delete local branch safe-branch
 1     delete remote branch origin/safe-branch
 1     close PR #101
@@ -100,7 +100,7 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 1   Last activity: Jan 15
 1   Dirty/Stash:   no / no
 1   Processes:     -
-1   Worktree:      /Users/bbloom/Projects/wt/main/tmprepo/gray-branch
+1   Worktree:      /tmp/wt-transcripts/tmprepo/gray-branch
 1   Reasons:
 1     - commits not merged into main
 1     - PR #102 open

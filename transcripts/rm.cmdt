@@ -5,12 +5,28 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 2 To ../remote.git
 2  * [new branch]      safe-branch -> safe-branch
 1 Cleaning safe-branch (branch safe-branch)
-1   removed worktree /Users/bbloom/Projects/wt/main/tmprepo/safe-branch
+1   removed worktree /tmp/wt-transcripts/tmprepo/safe-branch
 1   deleted local branch safe-branch
 1 To ../remote.git
 1  - [deleted]         safe-branch
 1   deleted remote branch origin/safe-branch
 1   closed PR #301
+1 Pruned remote origin
+
+$ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new pruned-branch --base main >/dev/null; cd ../pruned-branch; echo pruned >>README.md; git add README.md; git commit -m "pruned change" >/dev/null; git push -u origin pruned-branch >/dev/null; cd ../main; git --git-dir=../remote.git branch -D pruned-branch >/dev/null; printf "%s\n" "pruned-branch|311|OPEN|false|2000-01-30T00:00:00Z|https://example.com/pr/311" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt rm -f pruned-branch'
+2 To ../remote.git
+2  * [new branch]      main -> main
+2 Preparing worktree (new branch 'pruned-branch')
+2 To ../remote.git
+2  * [new branch]      pruned-branch -> pruned-branch
+1 Cleaning pruned-branch (branch pruned-branch)
+1   removed worktree /tmp/wt-transcripts/tmprepo/pruned-branch
+1   deleted local branch pruned-branch
+1   remote branch origin/pruned-branch already deleted
+1   closed PR #311
+1 Pruning origin
+1 URL: ../remote.git
+1  * [pruned] origin/pruned-branch
 1 Pruned remote origin
 
 $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new gray-branch --base main >/dev/null; cd ../gray-branch; echo gray >>README.md; git add README.md; GIT_AUTHOR_DATE=2000-01-30T00:00:00Z GIT_COMMITTER_DATE=2000-01-30T00:00:00Z git commit -m "gray change" >/dev/null; git push -u origin gray-branch >/dev/null; cd ../main; printf "%s\n" "gray-branch|302|OPEN|false|2000-01-30T00:00:00Z|https://example.com/pr/302" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; printf "y\n" | WT_NOW=2000-02-01T00:00:00Z ../../bin/wt rm gray-branch'
@@ -27,13 +43,13 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 1   Last activity: 2 days ago
 1   Dirty/Stash:   no / no
 1   Processes:     -
-1   Worktree:      /Users/bbloom/Projects/wt/main/tmprepo/gray-branch
+1   Worktree:      /tmp/wt-transcripts/tmprepo/gray-branch
 1   Reasons:
 1     - commits not merged into main
 1     - PR #302 open
 1 Proceed with cleanup? [y/N/q]: 
 1 Cleaning gray-branch (branch gray-branch)
-1   removed worktree /Users/bbloom/Projects/wt/main/tmprepo/gray-branch
+1   removed worktree /tmp/wt-transcripts/tmprepo/gray-branch
 1   deleted local branch gray-branch
 1 To ../remote.git
 1  - [deleted]         gray-branch
@@ -48,14 +64,14 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 2 To ../remote.git
 2  * [new branch]      force-branch -> force-branch
 1 Cleaning force-branch (branch force-branch)
-1   removed worktree /Users/bbloom/Projects/wt/main/tmprepo/force-branch
+1   removed worktree /tmp/wt-transcripts/tmprepo/force-branch
 1   deleted local branch force-branch
 1 To ../remote.git
 1  - [deleted]         force-branch
 1   deleted remote branch origin/force-branch
 1   closed PR #303
 1 Pruned remote origin
-1 Removed force-branch; run `cd /Users/bbloom/Projects/wt/main/tmprepo` to leave the deleted worktree
+1 Removed force-branch; run `cd /tmp/wt-transcripts/tmprepo` to leave the deleted worktree
 
 $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new preview-branch --base main >/dev/null; cd ../preview-branch; echo preview >>README.md; git add README.md; GIT_AUTHOR_DATE=2000-01-30T00:00:00Z GIT_COMMITTER_DATE=2000-01-30T00:00:00Z git commit -m "preview change" >/dev/null; git push -u origin preview-branch >/dev/null; cd ../main; printf "%s\n" "preview-branch|304|OPEN|false|2000-01-30T00:00:00Z|https://example.com/pr/304" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt rm -n ../preview-branch'
 2 To ../remote.git
@@ -64,7 +80,7 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 2 To ../remote.git
 2  * [new branch]      preview-branch -> preview-branch
 1 Will clean up preview-branch (branch preview-branch)
-1   - remove worktree /Users/bbloom/Projects/wt/main/tmprepo/preview-branch
+1   - remove worktree /tmp/wt-transcripts/tmprepo/preview-branch
 1   - delete local branch preview-branch
 1   - delete remote branch origin/preview-branch
 1   - close PR #304
@@ -93,14 +109,14 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 2 To ../remote.git
 2  * [new branch]      beta-branch -> beta-branch
 1 Cleaning alpha-branch (branch alpha-branch)
-1   removed worktree /Users/bbloom/Projects/wt/main/tmprepo/alpha-branch
+1   removed worktree /tmp/wt-transcripts/tmprepo/alpha-branch
 1   deleted local branch alpha-branch
 1 To ../remote.git
 1  - [deleted]         alpha-branch
 1   deleted remote branch origin/alpha-branch
 1   closed PR #401
 1 Cleaning beta-branch (branch beta-branch)
-1   removed worktree /Users/bbloom/Projects/wt/main/tmprepo/beta-branch
+1   removed worktree /tmp/wt-transcripts/tmprepo/beta-branch
 1   deleted local branch beta-branch
 1 To ../remote.git
 1  - [deleted]         beta-branch

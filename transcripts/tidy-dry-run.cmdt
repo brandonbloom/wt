@@ -10,7 +10,7 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 2 Preparing worktree (new branch 'dirty-branch')
 1 Will clean up:
 1 - safe-branch (branch safe-branch)
-1     remove worktree /Users/bbloom/Projects/wt/main/tmprepo/safe-branch
+1     remove worktree /tmp/wt-transcripts/tmprepo/safe-branch
 1     delete local branch safe-branch
 1     delete remote branch origin/safe-branch
 1     close PR #101

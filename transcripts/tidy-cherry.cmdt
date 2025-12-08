@@ -6,7 +6,7 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 2  * [new branch]      duplicate-pr -> duplicate-pr
 1 Will clean up:
 1 - duplicate-pr (branch duplicate-pr)
-1     remove worktree /Users/bbloom/Projects/wt/main/tmprepo/duplicate-pr
+1     remove worktree /tmp/wt-transcripts/tmprepo/duplicate-pr
 1     delete local branch duplicate-pr
 1     delete remote branch origin/duplicate-pr
 1

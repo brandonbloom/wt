@@ -10,7 +10,7 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 1 Plan:
 1 Will clean up:
 1 - safe-branch (branch safe-branch)
-1     remove worktree /Users/bbloom/Projects/wt/main/tmprepo/safe-branch
+1     remove worktree /tmp/wt-transcripts/tmprepo/safe-branch
 1     delete local branch safe-branch
 1     delete remote branch origin/safe-branch
 1     close PR #101
@@ -28,7 +28,7 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 1
 1 Skipped gray-branch: --policy=safe
 1 Cleaning safe-branch (branch safe-branch)
-1   removed worktree /Users/bbloom/Projects/wt/main/tmprepo/safe-branch
+1   removed worktree /tmp/wt-transcripts/tmprepo/safe-branch
 1   deleted local branch safe-branch
 1 To ../remote.git
 1  - [deleted]         safe-branch

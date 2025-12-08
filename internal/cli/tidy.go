@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"bufio"
 	"context"
 	"errors"
@@ -907,13 +908,59 @@ func gitDeleteLocalBranch(repoDir, branch string, log io.Writer) error {
 }
 
 func gitDeleteRemoteBranch(repoDir, branch string, log io.Writer) error {
-	if err := runGit(repoDir, log, "push", "origin", "--delete", branch); err != nil {
-		return err
-	}
+	cmd := exec.Command("git", "-C", repoDir, "push", "origin", "--delete", branch)
+	cmd.Stdin = os.Stdin
+
+	var buf bytes.Buffer
 	if log != nil {
+		cmd.Stdout = &buf
+		cmd.Stderr = &buf
+	} else {
+		cmd.Stdout = io.Discard
+		cmd.Stderr = io.Discard
+	}
+
+	if err := cmd.Run(); err != nil {
+		missing, checkErr := remoteBranchMissing(repoDir, "origin", branch)
+		if checkErr != nil || !missing {
+			if log != nil {
+				_, _ = log.Write(buf.Bytes())
+			}
+			return err
+		}
+		if log != nil {
+			fmt.Fprintf(log, "  remote branch origin/%s already deleted\n", branch)
+		}
+		return nil
+	}
+
+	if log != nil {
+		_, _ = log.Write(buf.Bytes())
 		fmt.Fprintf(log, "  deleted remote branch origin/%s\n", branch)
 	}
 	return nil
+}
+
+func remoteBranchMissing(repoDir, remote, branch string) (bool, error) {
+	exists, err := gitRemoteBranchExists(repoDir, remote, branch)
+	if err != nil {
+		return false, err
+	}
+	return !exists, nil
+}
+
+func gitRemoteBranchExists(repoDir, remote, branch string) (bool, error) {
+	if remote == "" || branch == "" {
+		return false, nil
+	}
+	var buf bytes.Buffer
+	cmd := exec.Command("git", "-C", repoDir, "ls-remote", "--heads", remote, branch)
+	cmd.Stdout = &buf
+	cmd.Stderr = io.Discard
+	if err := cmd.Run(); err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(buf.String()) != "", nil
 }
 
 func pruneRemote(log io.Writer, repoDir string) error {

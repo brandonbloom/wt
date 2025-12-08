@@ -4,8 +4,19 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 2 Preparing worktree (new branch 'safe-branch')
 2 To ../remote.git
 2  * [new branch]      safe-branch -> safe-branch
-2 unknown flag: --kill
-? 1
+1 Process cleanup:
+1 - safe-branch
+1     server (4444)
+1     signal: SIGTERM (15)
+1
+1 Will prompt for:
+1 - safe-branch (branch safe-branch)
+1     reasons:
+1       * processes running: server (4444)
+1
+1
+1 Remote maintenance:
+1 - git remote prune origin
 
 $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new safe-branch --base main >/dev/null; cd ../safe-branch; echo safe >>README.md; git add README.md; git commit -m "safe change" >/dev/null; git push -u origin safe-branch >/dev/null; cd ../main; git merge safe-branch >/dev/null; printf '"'"'[{"pid":5555,"ppid":200,"command":"server","cwd":"%s/../safe-branch"}]\n'"'"' "$(pwd)" >processes.json; export PATH="$(pwd)/../bin:$PATH"; export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt tidy --kill --safe'
 2 To ../remote.git
@@ -13,5 +24,23 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 2 Preparing worktree (new branch 'safe-branch')
 2 To ../remote.git
 2  * [new branch]      safe-branch -> safe-branch
-2 unknown flag: --kill
-? 1
+1 Killing processes in safe-branch (signal SIGTERM (15))
+1   cleared
+1 Plan:
+1 Will clean up:
+1 - safe-branch (branch safe-branch)
+1     remove worktree /tmp/wt-transcripts/tmprepo/safe-branch
+1     delete local branch safe-branch
+1     delete remote branch origin/safe-branch
+1
+1
+1 Remote maintenance:
+1 - git remote prune origin
+1
+1 Cleaning safe-branch (branch safe-branch)
+1   removed worktree /tmp/wt-transcripts/tmprepo/safe-branch
+1   deleted local branch safe-branch
+1 To ../remote.git
+1  - [deleted]         safe-branch
+1   deleted remote branch origin/safe-branch
+1 Pruned remote origin

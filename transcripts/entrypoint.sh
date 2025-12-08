@@ -21,6 +21,16 @@ activate_wrapper=0
 worktree=""
 keep_repo=0
 
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+transcripts_root="/tmp/wt-transcripts"
+lock_dir="/tmp/wt-transcripts.lock"
+
+mkdir -p "${transcripts_root}"
+ln -snf "${repo_root}/bin" "${transcripts_root}/bin"
+while ! mkdir "${lock_dir}" 2>/dev/null; do
+  sleep 0.1
+done
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-init)
@@ -63,16 +73,16 @@ if [[ $# -eq 0 ]]; then
   exit 1
 fi
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 tmprepo_rel="tmprepo"
-tmprepo="${repo_root}/${tmprepo_rel}"
+tmprepo="${transcripts_root}/${tmprepo_rel}"
 
 cleanup() {
   if [[ $keep_repo -eq 1 ]]; then
     echo "temp repo kept at ${tmprepo}" >&2
-    return
+  else
+    "${repo_root}/scripts/cleanup.sh" "${tmprepo_rel}"
   fi
-  "${repo_root}/scripts/cleanup.sh" "${tmprepo_rel}"
+  rmdir "${lock_dir}"
 }
 trap cleanup EXIT
 
@@ -86,6 +96,9 @@ export GIT_COMMITTER_NAME=wt-test
 export GIT_COMMITTER_EMAIL=wt@example.com
 export GIT_AUTHOR_DATE='2000-01-01T00:00:00Z'
 export GIT_COMMITTER_DATE='2000-01-01T00:00:00Z'
+export NO_COLOR=1
+export CLICOLOR=0
+export CLICOLOR_FORCE=0
 
 git init -b main >/dev/null
 echo hi >README.md

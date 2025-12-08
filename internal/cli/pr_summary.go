@@ -109,7 +109,7 @@ func summarizePullRequestState(ctx prContext, prs []pullRequestInfo) prSummary {
 	}
 	pr := prs[0]
 	state := formatPRState(pr)
-	text := fmt.Sprintf("PR #%d %s; new commits pending", pr.Number, state)
+	text := fmt.Sprintf("PR #%d %s; unpublished commits", pr.Number, state)
 	return prSummary{
 		Operation: text,
 		Column:    text,

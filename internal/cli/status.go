@@ -70,7 +70,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 			continue
 		}
 		status.Current = wt.Name == current
-		status.PRStatus = "PR: pending"
+		status.PRStatus = prLoadingLabel
 		statuses = append(statuses, status)
 	}
 
@@ -237,6 +237,8 @@ const (
 	columnGap      = "   "
 	columnGapWidth = len(columnGap)
 )
+
+const prLoadingLabel = "PR: loading..."
 
 const statusColumnCount = 3
 
@@ -739,7 +741,7 @@ func markPRInterrupted(statuses []*worktreeStatus, onUpdate func(*worktreeStatus
 		pr := strings.TrimSpace(status.PRStatus)
 		switch {
 		case pr == "":
-		case strings.EqualFold(pr, "PR: pending"):
+		case strings.EqualFold(pr, prLoadingLabel):
 		case strings.EqualFold(pr, prInterruptedLabel):
 		default:
 			continue
@@ -778,6 +780,9 @@ func isDetachedHeadError(err error) bool {
 func combineStatusDetail(prStatus, ciStatus string) string {
 	pr := strings.TrimSpace(prStatus)
 	ci := strings.TrimSpace(ciStatus)
+	if isNoPRStatus(pr) && isCIMissingCommit(ci) {
+		ci = ""
+	}
 	switch {
 	case pr != "" && ci != "":
 		switch {
@@ -795,4 +800,12 @@ func combineStatusDetail(prStatus, ciStatus string) string {
 	default:
 		return ""
 	}
+}
+
+func isNoPRStatus(text string) bool {
+	return strings.EqualFold(strings.TrimSpace(text), "No PR")
+}
+
+func isCIMissingCommit(text string) bool {
+	return strings.EqualFold(strings.TrimSpace(text), ciMissingCommitLabel)
 }

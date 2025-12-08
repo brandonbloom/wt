@@ -27,9 +27,13 @@ const (
 )
 
 const (
-	ciInterruptedLabel = "CI: interrupted"
-	prInterruptedLabel = "PR: interrupted"
+	ciInterruptedLabel   = "CI: interrupted"
+	prInterruptedLabel   = "PR: interrupted"
+	ciMissingCommitMsg   = "unpublished"
+	ciMissingCommitLabel = "CI: ? " + ciMissingCommitMsg
 )
+
+var errCommitNotOnGitHub = errors.New("commit not on GitHub")
 
 type ciRunSummary struct {
 	Name        string
@@ -145,7 +149,7 @@ func fetchCIStatuses(ctx context.Context, opts ciFetchOptions, statuses []*workt
 	for res := range results {
 		if res.err != nil {
 			combined = errors.Join(combined, res.err)
-			msg := fmt.Sprintf("CI: ? %s", singleLineError(res.err))
+			msg := formatCIErrorLabel(res.err)
 			for _, status := range res.req.statuses {
 				setCIError(status, msg, ciStateError)
 				if onUpdate != nil {
@@ -257,7 +261,7 @@ func runGhJSON(ctx context.Context, workdir string, args ...string) ([]byte, err
 		if msg == "" {
 			msg = err.Error()
 		}
-		return nil, fmt.Errorf("gh %s: %s", strings.Join(args, " "), msg)
+		return nil, classifyGhError(msg, err)
 	}
 	return stdout.Bytes(), nil
 }
@@ -275,6 +279,28 @@ func markCIInterrupted(statuses []*worktreeStatus, onUpdate func(*worktreeStatus
 			onUpdate(status)
 		}
 	}
+}
+
+func classifyGhError(msg string, base error) error {
+	lower := strings.ToLower(msg)
+	switch {
+	case strings.Contains(lower, "no commit found for sha"):
+		return fmt.Errorf("%w", errCommitNotOnGitHub)
+	case strings.Contains(lower, "not found") && strings.Contains(lower, "/commits/"):
+		return fmt.Errorf("%w", errCommitNotOnGitHub)
+	}
+	trimmed := strings.TrimSpace(msg)
+	if trimmed == "" && base != nil {
+		trimmed = base.Error()
+	}
+	return fmt.Errorf("gh: %s", trimmed)
+}
+
+func formatCIErrorLabel(err error) string {
+	if errors.Is(err, errCommitNotOnGitHub) {
+		return ciMissingCommitLabel
+	}
+	return fmt.Sprintf("CI: ? %s", singleLineError(err))
 }
 
 type ghCheckRunsResponse struct {

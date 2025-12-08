@@ -1,6 +1,10 @@
 package cli
 
-import "testing"
+import (
+	"errors"
+	"fmt"
+	"testing"
+)
 
 func TestMarkCIInterrupted(t *testing.T) {
 	statuses := []*worktreeStatus{
@@ -20,5 +24,21 @@ func TestMarkCIInterrupted(t *testing.T) {
 	}
 	if got := statuses[1].CIStatus; got != "CI✓" {
 		t.Fatalf("status 1 CIStatus changed to %q, want CI✓", got)
+	}
+}
+
+func TestFormatCIErrorLabelCommitMissing(t *testing.T) {
+	err := fmt.Errorf("wrap: %w", errCommitNotOnGitHub)
+	got := formatCIErrorLabel(err)
+	want := fmt.Sprintf("CI: ? %s", ciMissingCommitMsg)
+	if got != want {
+		t.Fatalf("formatCIErrorLabel() = %q, want %q", got, want)
+	}
+}
+
+func TestClassifyGhErrorDetectsMissingCommit(t *testing.T) {
+	err := classifyGhError("gh: No commit found for SHA: 123", errors.New("fail"))
+	if !errors.Is(err, errCommitNotOnGitHub) {
+		t.Fatalf("expected errCommitNotOnGitHub, got %v", err)
 	}
 }

@@ -53,3 +53,13 @@ func TestStatusFieldsCombinesInterrupted(t *testing.T) {
 		t.Fatalf("detail field = %q, want %q", got, "PR/CI: interrupted")
 	}
 }
+
+func TestCombineStatusDetailOmitsCINoiseForNoPR(t *testing.T) {
+	if got := combineStatusDetail("No PR", ciMissingCommitLabel); got != "No PR" {
+		t.Fatalf("combineStatusDetail = %q, want %q", got, "No PR")
+	}
+	want := "No PR · CI✓"
+	if got := combineStatusDetail("No PR", "CI✓"); got != want {
+		t.Fatalf("combineStatusDetail = %q, want %q", got, want)
+	}
+}

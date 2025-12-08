@@ -4,7 +4,7 @@ import "testing"
 
 func TestMarkPRInterrupted(t *testing.T) {
 	statuses := []*worktreeStatus{
-		{Name: "pending", PRStatus: "PR: pending"},
+		{Name: "pending", PRStatus: prLoadingLabel},
 		{Name: "custom", PRStatus: "PR #42 open"},
 		{Name: "empty"},
 	}

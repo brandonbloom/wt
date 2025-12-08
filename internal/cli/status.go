@@ -362,14 +362,7 @@ func statusFields(status *worktreeStatus, now time.Time, includeSummary bool, pr
 	if !status.Timestamp.IsZero() {
 		relative = timefmt.Relative(status.Timestamp, now)
 	}
-	detail := strings.TrimSpace(status.PRStatus)
-	if status.CIStatus != "" {
-		if detail != "" {
-			detail = fmt.Sprintf("%s · %s", detail, status.CIStatus)
-		} else {
-			detail = status.CIStatus
-		}
-	}
+	detail := combineStatusDetail(status.PRStatus, status.CIStatus)
 	if includeSummary {
 		if summary := summarizeProcesses(status.Processes, defaultProcessSummaryLimit); summary != "" {
 			detail = appendProcessSummary(detail, summary, prWidth)
@@ -704,7 +697,11 @@ func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus, o
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			err := ctx.Err()
+			if errors.Is(err, context.Canceled) {
+				markPRInterrupted(statuses, onUpdate)
+			}
+			return err
 		case res, ok := <-results:
 			if !ok {
 				return combined
@@ -734,6 +731,26 @@ func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus, o
 	}
 }
 
+func markPRInterrupted(statuses []*worktreeStatus, onUpdate func(*worktreeStatus)) {
+	for _, status := range statuses {
+		if status == nil {
+			continue
+		}
+		pr := strings.TrimSpace(status.PRStatus)
+		switch {
+		case pr == "":
+		case strings.EqualFold(pr, "PR: pending"):
+		case strings.EqualFold(pr, prInterruptedLabel):
+		default:
+			continue
+		}
+		status.PRStatus = prInterruptedLabel
+		if onUpdate != nil {
+			onUpdate(status)
+		}
+	}
+}
+
 func statusPreflight(cmd *cobra.Command) {
 	if shellbridge.Active() && shellbridge.InstructionFile() != "" {
 		return
@@ -757,4 +774,25 @@ func isDetachedHeadError(err error) bool {
 	}
 	msg := err.Error()
 	return strings.Contains(msg, "does not point to a branch") || strings.Contains(msg, "You are not currently on a branch")
+}
+func combineStatusDetail(prStatus, ciStatus string) string {
+	pr := strings.TrimSpace(prStatus)
+	ci := strings.TrimSpace(ciStatus)
+	switch {
+	case pr != "" && ci != "":
+		switch {
+		case pr == prInterruptedLabel && ci == ciInterruptedLabel:
+			return "PR/CI: interrupted"
+		case strings.EqualFold(pr, ci):
+			return pr
+		default:
+			return fmt.Sprintf("%s · %s", pr, ci)
+		}
+	case pr != "":
+		return pr
+	case ci != "":
+		return ci
+	default:
+		return ""
+	}
 }

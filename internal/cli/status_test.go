@@ -38,3 +38,18 @@ func TestBuildColumnLayoutUsesFullWidth(t *testing.T) {
 		t.Fatalf("last column width did not expand: base=%d new=%d", baseLayout.widths[statusColumnCount-1], last)
 	}
 }
+
+func TestStatusFieldsCombinesInterrupted(t *testing.T) {
+	now := time.Now()
+	status := &worktreeStatus{
+		Name:      "whimsical-canoe",
+		Timestamp: now,
+		PRStatus:  prInterruptedLabel,
+		CIStatus:  ciInterruptedLabel,
+	}
+
+	fields := statusFields(status, now, false, 0)
+	if got := fields[2]; got != "PR/CI: interrupted" {
+		t.Fatalf("detail field = %q, want %q", got, "PR/CI: interrupted")
+	}
+}

@@ -26,6 +26,11 @@ const (
 	ciStateError
 )
 
+const (
+	ciInterruptedLabel = "CI: interrupted"
+	prInterruptedLabel = "PR: interrupted"
+)
+
 type ciRunSummary struct {
 	Name        string
 	Status      string
@@ -156,6 +161,13 @@ func fetchCIStatuses(ctx context.Context, opts ciFetchOptions, statuses []*workt
 			}
 		}
 	}
+	if err := ctx.Err(); errors.Is(err, context.Canceled) {
+		markCIInterrupted(statuses, onUpdate)
+		if combined != nil {
+			return errors.Join(combined, err)
+		}
+		return err
+	}
 	return combined
 }
 
@@ -236,6 +248,11 @@ func runGhJSON(ctx context.Context, workdir string, args ...string) ([]byte, err
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
+		if ctx != nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return nil, ctxErr
+			}
+		}
 		msg := strings.TrimSpace(stderr.String())
 		if msg == "" {
 			msg = err.Error()
@@ -243,6 +260,21 @@ func runGhJSON(ctx context.Context, workdir string, args ...string) ([]byte, err
 		return nil, fmt.Errorf("gh %s: %s", strings.Join(args, " "), msg)
 	}
 	return stdout.Bytes(), nil
+}
+
+func markCIInterrupted(statuses []*worktreeStatus, onUpdate func(*worktreeStatus)) {
+	for _, status := range statuses {
+		if status == nil {
+			continue
+		}
+		if strings.TrimSpace(status.CIStatus) != "" {
+			continue
+		}
+		setCIError(status, ciInterruptedLabel, ciStateError)
+		if onUpdate != nil {
+			onUpdate(status)
+		}
+	}
 }
 
 type ghCheckRunsResponse struct {

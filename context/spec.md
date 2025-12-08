@@ -47,7 +47,7 @@
 
 - `wt new` creates a new git worktree rooted in the current project.
 - New worktree names must be short, memorable, distinct, and inoffensive.
-- Strategy: adjective–noun pairs chosen from hard-coded curated dictionaries (~100 safe words in each category).
+- Strategy: adjective–noun pairs chosen from hard-coded curated dictionaries (several hundred safe words in each category).
 - `wt new [<name>]` accepts an optional explicit worktree/branch name; omit `<name>` to use the adjective–noun generator.
 - `wt new` accepts `--base=<branch>` to choose the branch used to seed the new worktree. Default base logic:
   - If invoked from an existing worktree with a current branch, use that branch.

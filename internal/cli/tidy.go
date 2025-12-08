@@ -1,14 +1,16 @@
 package cli
 
 import (
-	"bytes"
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -888,6 +890,9 @@ func performCleanup(ctx context.Context, log io.Writer, proj *project.Project, c
 }
 
 func gitWorktreeRemove(repoDir, path string, log io.Writer) error {
+	if err := makeTreeWritable(path); err != nil {
+		return fmt.Errorf("reset permissions: %w", err)
+	}
 	if err := runGit(repoDir, nil, "worktree", "remove", "--force", path); err != nil {
 		return err
 	}
@@ -974,16 +979,43 @@ func pruneRemote(log io.Writer, repoDir string) error {
 }
 
 func runGit(dir string, out io.Writer, args ...string) error {
+	_, err := runGitCapture(dir, out, args...)
+	return err
+}
+
+func runGitCapture(dir string, out io.Writer, args ...string) (string, error) {
 	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
 	cmd.Stdin = os.Stdin
+	var buf bytes.Buffer
+	writer := io.Writer(io.Discard)
 	if out != nil {
-		cmd.Stdout = out
-		cmd.Stderr = out
-	} else {
-		cmd.Stdout = io.Discard
-		cmd.Stderr = io.Discard
+		writer = out
 	}
-	return cmd.Run()
+	multi := io.MultiWriter(writer, &buf)
+	cmd.Stdout = multi
+	cmd.Stderr = multi
+	err := cmd.Run()
+	return buf.String(), err
+}
+
+func makeTreeWritable(root string) error {
+	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		mode := info.Mode()
+		if mode&os.ModeSymlink != 0 {
+			return nil
+		}
+		if mode&0o200 != 0 {
+			return nil
+		}
+		return os.Chmod(path, mode|0o200)
+	})
 }
 
 func closePullRequest(ctx context.Context, dir, branch string, number int) error {

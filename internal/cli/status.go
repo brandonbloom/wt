@@ -306,6 +306,7 @@ func buildColumnLayout(statuses []*worktreeStatus, now time.Time, maxWidth int) 
 		if total < maxWidth {
 			widths[len(widths)-1] += maxWidth - total
 		}
+		layout.widths = widths
 		layout.prDisplayWidth = widths[statusColumnCount-1]
 		return layout
 	}

@@ -3,6 +3,7 @@ package cli
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -44,6 +45,7 @@ func runRm(cmd *cobra.Command, opts *rmOptions, args []string) error {
 	if err != nil {
 		return err
 	}
+	ciRepo, ciRepoErr := resolveGitHubRepo(proj)
 
 	initialWD, err := os.Getwd()
 	if err != nil {
@@ -91,6 +93,25 @@ func runRm(cmd *cobra.Command, opts *rmOptions, args []string) error {
 		if err := loadRmPullRequests(cmd.Context(), cand); err != nil {
 			fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s\n", singleLineError(err))
 		}
+	}
+
+	statuses := make([]*worktreeStatus, len(targetCands))
+	for i, cand := range targetCands {
+		statuses[i] = candidateToStatus(cand, now)
+		cand.status = statuses[i]
+	}
+	ciOpts := ciFetchOptions{
+		Repo:       ciRepo,
+		RepoErr:    ciRepoErr,
+		RemoteName: proj.Config.CIRemote(),
+		Workdir:    proj.DefaultWorktreePath,
+	}
+	if err := fetchCIStatuses(cmd.Context(), ciOpts, statuses, now, nil); err != nil && errors.Is(err, context.Canceled) {
+		fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s\n", singleLineError(err))
+	}
+	updateCandidatesCIState(targetCands)
+
+	for _, cand := range targetCands {
 		deriveClassification(cand, now)
 		if cand.Classification == tidyBlocked {
 			return fmt.Errorf("cannot remove %s: %s", cand.Worktree.Name, strings.Join(cand.BlockReasons, "; "))

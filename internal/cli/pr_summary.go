@@ -86,7 +86,7 @@ type prContext struct {
 
 func summarizePullRequestState(ctx prContext, prs []pullRequestInfo) prSummary {
 	if !ctx.HasPendingWork {
-		return prSummary{Column: "PR: none"}
+		return prSummary{Column: "No PR"}
 	}
 	active := openPullRequests(prs)
 	if len(active) > 0 {
@@ -99,12 +99,12 @@ func summarizePullRequestState(ctx prContext, prs []pullRequestInfo) prSummary {
 		return prSummary{Operation: text, Column: text}
 	}
 	if !ctx.HasUniqueCommits {
-		return prSummary{Column: "PR: none"}
+		return prSummary{Column: ""}
 	}
 	if len(prs) == 0 {
 		return prSummary{
-			Column: "PR: no PR",
-			Reason: "no PR",
+			Column: "No PR",
+			Reason: "No PR",
 		}
 	}
 	pr := prs[0]

@@ -1,19 +1,24 @@
-$ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new safe-branch --base main >/dev/null; cd ../safe-branch; echo safe >>README.md; git add README.md; git commit -m "safe change" >/dev/null; git push -u origin safe-branch >/dev/null; cd ../main; git merge safe-branch >/dev/null; printf "%s\n" "safe-branch|301|OPEN|false|2000-01-30T00:00:00Z|https://example.com/pr/301" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt rm safe-branch'
+$ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new safe-branch --base main >/dev/null; cd ../safe-branch; echo safe >>README.md; git add README.md; git commit -m "safe change" >/dev/null; git push -u origin safe-branch >/dev/null; cd ../main; git merge safe-branch >/dev/null; printf "%s\n" "safe-branch|301|OPEN|false|2000-01-30T00:00:00Z|https://example.com/pr/301" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt rm safe-branch'
 2 To ../remote.git
 2  * [new branch]      main -> main
 2 Preparing worktree (new branch 'safe-branch')
 2 To ../remote.git
 2  * [new branch]      safe-branch -> safe-branch
-1 Cleaning safe-branch (branch safe-branch)
-1   removed worktree /tmp/wt-transcripts/tmprepo/safe-branch
-1   deleted local branch safe-branch
-1 To ../remote.git
-1  - [deleted]         safe-branch
-1   deleted remote branch origin/safe-branch
-1   closed PR #301
-1 Pruned remote origin
+1
+1 safe-branch (branch safe-branch)
+1 ----------------------------------------
+1   PR:            none
+1   Divergence:    +1/-0 vs main
+1   Last activity: 2 days ago
+1   Dirty/Stash:   no / no
+1   Processes:     -
+1   Worktree:      /tmp/wt-transcripts/tmprepo/safe-branch
+1   Reasons:
+1     - CI status unknown
+1 Proceed with cleanup? [y/N/q]: 
+1 Skipped safe-branch: declined
 
-$ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new pruned-branch --base main >/dev/null; cd ../pruned-branch; echo pruned >>README.md; git add README.md; git commit -m "pruned change" >/dev/null; git push -u origin pruned-branch >/dev/null; cd ../main; git --git-dir=../remote.git branch -D pruned-branch >/dev/null; printf "%s\n" "pruned-branch|311|OPEN|false|2000-01-30T00:00:00Z|https://example.com/pr/311" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt rm -f pruned-branch'
+$ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new pruned-branch --base main >/dev/null; cd ../pruned-branch; echo pruned >>README.md; git add README.md; git commit -m "pruned change" >/dev/null; git push -u origin pruned-branch >/dev/null; cd ../main; git --git-dir=../remote.git branch -D pruned-branch >/dev/null; printf "%s\n" "pruned-branch|311|OPEN|false|2000-01-30T00:00:00Z|https://example.com/pr/311" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt rm -f pruned-branch'
 2 To ../remote.git
 2  * [new branch]      main -> main
 2 Preparing worktree (new branch 'pruned-branch')
@@ -29,13 +34,13 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 1  * [pruned] origin/pruned-branch
 1 Pruned remote origin
 
-$ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new gray-branch --base main >/dev/null; cd ../gray-branch; echo gray >>README.md; git add README.md; GIT_AUTHOR_DATE=2000-01-30T00:00:00Z GIT_COMMITTER_DATE=2000-01-30T00:00:00Z git commit -m "gray change" >/dev/null; git push -u origin gray-branch >/dev/null; cd ../main; printf "%s\n" "gray-branch|302|OPEN|false|2000-01-30T00:00:00Z|https://example.com/pr/302" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; printf "y\n" | WT_NOW=2000-02-01T00:00:00Z ../../bin/wt rm gray-branch'
+$ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new gray-branch --base main >/dev/null; cd ../gray-branch; echo gray >>README.md; git add README.md; GIT_AUTHOR_DATE=2000-01-30T00:00:00Z GIT_COMMITTER_DATE=2000-01-30T00:00:00Z git commit -m "gray change" >/dev/null; git push -u origin gray-branch >/dev/null; cd ../main; printf "%s\n" "gray-branch|302|OPEN|false|2000-01-30T00:00:00Z|https://example.com/pr/302" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; printf "y\n" | WT_NOW=2000-02-01T00:00:00Z ../../bin/wt rm gray-branch'
 2 To ../remote.git
 2  * [new branch]      main -> main
 2 Preparing worktree (new branch 'gray-branch')
 2 To ../remote.git
 2  * [new branch]      gray-branch -> gray-branch
-1 
+1
 1 gray-branch (branch gray-branch)
 1 ----------------------------------------
 1   PR:            #302 open
@@ -45,6 +50,7 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 1   Processes:     -
 1   Worktree:      /tmp/wt-transcripts/tmprepo/gray-branch
 1   Reasons:
+1     - CI status unknown
 1     - commits not merged into main
 1     - PR #302 open
 1 Proceed with cleanup? [y/N/q]: 
@@ -57,7 +63,7 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 1   closed PR #302
 1 Pruned remote origin
 
-$ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new force-branch --base main >/dev/null; cd ../force-branch; echo force >>README.md; git add README.md; GIT_AUTHOR_DATE=2000-01-30T00:00:00Z GIT_COMMITTER_DATE=2000-01-30T00:00:00Z git commit -m "force change" >/dev/null; git push -u origin force-branch >/dev/null; printf "%s\n" "force-branch|303|OPEN|false|2000-01-30T00:00:00Z|https://example.com/pr/303" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt rm -f'
+$ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new force-branch --base main >/dev/null; cd ../force-branch; echo force >>README.md; git add README.md; GIT_AUTHOR_DATE=2000-01-30T00:00:00Z GIT_COMMITTER_DATE=2000-01-30T00:00:00Z git commit -m "force change" >/dev/null; git push -u origin force-branch >/dev/null; printf "%s\n" "force-branch|303|OPEN|false|2000-01-30T00:00:00Z|https://example.com/pr/303" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt rm -f'
 2 To ../remote.git
 2  * [new branch]      main -> main
 2 Preparing worktree (new branch 'force-branch')
@@ -73,7 +79,7 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 1 Pruned remote origin
 1 Removed force-branch; run `cd /tmp/wt-transcripts/tmprepo` to leave the deleted worktree
 
-$ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new preview-branch --base main >/dev/null; cd ../preview-branch; echo preview >>README.md; git add README.md; GIT_AUTHOR_DATE=2000-01-30T00:00:00Z GIT_COMMITTER_DATE=2000-01-30T00:00:00Z git commit -m "preview change" >/dev/null; git push -u origin preview-branch >/dev/null; cd ../main; printf "%s\n" "preview-branch|304|OPEN|false|2000-01-30T00:00:00Z|https://example.com/pr/304" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt rm -n ../preview-branch'
+$ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new preview-branch --base main >/dev/null; cd ../preview-branch; echo preview >>README.md; git add README.md; GIT_AUTHOR_DATE=2000-01-30T00:00:00Z GIT_COMMITTER_DATE=2000-01-30T00:00:00Z git commit -m "preview change" >/dev/null; git push -u origin preview-branch >/dev/null; cd ../main; printf "%s\n" "preview-branch|304|OPEN|false|2000-01-30T00:00:00Z|https://example.com/pr/304" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt rm -n ../preview-branch'
 2 To ../remote.git
 2  * [new branch]      main -> main
 2 Preparing worktree (new branch 'preview-branch')
@@ -84,22 +90,23 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 1   - delete local branch preview-branch
 1   - delete remote branch origin/preview-branch
 1   - close PR #304
-1 
+1
 1 Worktree requires confirmation:
+1   - CI status unknown
 1   - commits not merged into main
 1   - PR #304 open
-1 
+1
 1 Remote maintenance:
 1 - git remote prune origin
 
-$ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new dirty-branch --base main >/dev/null; cd ../dirty-branch; echo dirty >>README.md; printf "%s\n" "dirty-branch|305|OPEN|false|2000-01-30T00:00:00Z|https://example.com/pr/305" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt rm dirty-branch'
+$ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new dirty-branch --base main >/dev/null; cd ../dirty-branch; echo dirty >>README.md; printf "%s\n" "dirty-branch|305|OPEN|false|2000-01-30T00:00:00Z|https://example.com/pr/305" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt rm dirty-branch'
 2 To ../remote.git
 2  * [new branch]      main -> main
 2 Preparing worktree (new branch 'dirty-branch')
 2 cannot remove dirty-branch: worktree has uncommitted changes
 ? 1
 
-$ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new alpha-branch --base main >/dev/null; cd ../alpha-branch; echo alpha >>README.md; git add README.md; git commit -m "alpha change" >/dev/null; git push -u origin alpha-branch >/dev/null; cd ../main; git merge alpha-branch >/dev/null; ../../bin/wt new beta-branch --base main >/dev/null; cd ../beta-branch; echo beta >>README.md; git add README.md; git commit -m "beta change" >/dev/null; git push -u origin beta-branch >/dev/null; cd ../main; git merge beta-branch >/dev/null; printf "%s\n" "alpha-branch|401|OPEN|false|2000-01-30T00:00:00Z|https://example.com/pr/401" "beta-branch|402|OPEN|false|2000-01-30T00:00:00Z|https://example.com/pr/402" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt rm alpha-branch beta-branch'
+$ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new alpha-branch --base main >/dev/null; cd ../alpha-branch; echo alpha >>README.md; git add README.md; git commit -m "alpha change" >/dev/null; git push -u origin alpha-branch >/dev/null; cd ../main; git merge alpha-branch >/dev/null; ../../bin/wt new beta-branch --base main >/dev/null; cd ../beta-branch; echo beta >>README.md; git add README.md; git commit -m "beta change" >/dev/null; git push -u origin beta-branch >/dev/null; cd ../main; git merge beta-branch >/dev/null; printf "%s\n" "alpha-branch|401|OPEN|false|2000-01-30T00:00:00Z|https://example.com/pr/401" "beta-branch|402|OPEN|false|2000-01-30T00:00:00Z|https://example.com/pr/402" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt rm alpha-branch beta-branch'
 2 To ../remote.git
 2  * [new branch]      main -> main
 2 Preparing worktree (new branch 'alpha-branch')
@@ -108,18 +115,29 @@ $ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare 
 2 Preparing worktree (new branch 'beta-branch')
 2 To ../remote.git
 2  * [new branch]      beta-branch -> beta-branch
-1 Cleaning alpha-branch (branch alpha-branch)
-1   removed worktree /tmp/wt-transcripts/tmprepo/alpha-branch
-1   deleted local branch alpha-branch
-1 To ../remote.git
-1  - [deleted]         alpha-branch
-1   deleted remote branch origin/alpha-branch
-1   closed PR #401
-1 Cleaning beta-branch (branch beta-branch)
-1   removed worktree /tmp/wt-transcripts/tmprepo/beta-branch
-1   deleted local branch beta-branch
-1 To ../remote.git
-1  - [deleted]         beta-branch
-1   deleted remote branch origin/beta-branch
-1   closed PR #402
-1 Pruned remote origin
+1
+1 alpha-branch (branch alpha-branch)
+1 ----------------------------------------
+1   PR:            none
+1   Divergence:    +1/-0 vs main
+1   Last activity: 2 days ago
+1   Dirty/Stash:   no / no
+1   Processes:     -
+1   Worktree:      /tmp/wt-transcripts/tmprepo/alpha-branch
+1   Reasons:
+1     - CI status unknown
+1 Proceed with cleanup? [y/N/q]: 
+1 Skipped alpha-branch: declined
+1
+1 beta-branch (branch beta-branch)
+1 ----------------------------------------
+1   PR:            none
+1   Divergence:    +2/-0 vs main
+1   Last activity: 2 days ago
+1   Dirty/Stash:   no / no
+1   Processes:     -
+1   Worktree:      /tmp/wt-transcripts/tmprepo/beta-branch
+1   Reasons:
+1     - CI status unknown
+1 Proceed with cleanup? [y/N/q]: 
+1 Skipped beta-branch: declined

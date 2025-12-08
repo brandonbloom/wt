@@ -40,6 +40,7 @@
   - `[bootstrap]` section with a `run = "..."` field whose contents are executed in the user’s default shell (`$SHELL`) immediately after `wt new` creates and enters a worktree. The command runs synchronously and inherits stdin/stdout/stderr; failures abort the `wt new` flow with a clear message.
   - Optional `[bootstrap].strict = false` toggle; when omitted, bootstrap scripts execute under `set -euo pipefail` for safety. Setting `strict = false` reverts to lenient shell semantics.
   - Optional `[process]` section with `kill_timeout = "3s"` (Go duration syntax) that provides the default wait time used by `wt kill` and `wt tidy --kill` before they report a stubborn process as still running. Command-line `--timeout` flags override this value.
+  - Optional `[ci]` section with `remote = "origin"` to override which git remote supplies the `{owner, repo}` tuple for CI lookups; future CI knobs belong here.
 - The README must document the configuration file, the `default_branch` field, and the `[bootstrap]` section semantics so that users can edit it without referring to the source.
 - A dedicated `wt bootstrap` command reruns the configured bootstrap script within the current worktree, allowing users to reset dependencies or rerun setup later. It respects the `[bootstrap].strict` setting but also accepts `--strict`, `--no-strict`, and `-x/--xtrace` flags to temporarily override strict mode or enable shell tracing.
 
@@ -69,9 +70,18 @@
 - Before hitting git, `wt status` should perform lightweight “doctor-lite” checks (wrapper active, `.wt` discoverable, default worktree healthy) and surface any failures inline so users fix issues before reading stale data.
 - Required data per worktree:
   - Git details (branch name, ahead/behind vs upstream, dirty state).
+- GitHub CI data appears next to the existing git/PR/process columns:
+  - All metadata is fetched via `gh` so auth/device flows match the rest of the toolchain; no direct HTTP calls or PAT env vars.
+  - Resolve `{owner, repo}` from a single git remote (default `origin`, overridable via `.wt/config.toml`).
+  - When a worktree has an open PR, inspect the PR’s merge commit SHA to match GitHub’s merge-gating behavior; otherwise inspect the worktree’s HEAD commit.
+  - Primary call: `gh api repos/{owner}/{repo}/commits/{sha}/check-suites` (and nested check runs). If no suites exist, fall back to `gh run list --branch <branch> --json status,conclusion,name,url` filtered to the relevant commit/branch.
+  - Fetches run asynchronously after local data renders; rows update in place as results stream in.
+- Each row displays a terse CI badge (`CI✓` when all runs succeed, `CI◷` when anything is queued/in-progress, `CI✗ <job>` when a run fails—show only the highest-severity job/workflow name plus relative age, `CI!` for neutral/skipped-only suites). Branch-only workflows that never execute on the current branch omit the CI column entirely.
+  - Pending jobs stay badge-only; the focused worktree’s detail panel lists at most one failing job/run (name, conclusion, relative duration, URL) to keep noise down.
+  - CLI failures (missing `gh`, auth issues, rate limits) never abort `wt status`; instead, rows show `CI? gh error` (dim) and downstream commands treat the worktree as gray/unknown.
 - Timestamp derived as: newest file mtime when the worktree is dirty or has staged changes; otherwise use the HEAD commit timestamp. Display the timestamp as a friendly relative string (e.g., `3s ago`, `2 min ago`, `yesterday 2pm`, `4 days ago`) instead of raw ISO text.
   - If the branch has an associated GitHub pull request, display its status.
-- Pull request summaries follow the same rules as `wt tidy`: only show badges when the worktree has local changes or commits that are not yet on the default branch. Branches with commits but no PR show `PR: no PR`, while branches with closed/merged PRs and new commits show `PR #123 merged; new commits pending` (or an equivalent state string). Clean branches that already match the default branch fall back to `PR: none`.
+- Pull request summaries follow the same rules as `wt tidy`: only show badges when the worktree has local changes or commits that are not yet on the default branch. Worktrees without an associated PR display `No PR`, while branches with closed/merged PRs and new commits show `PR #123 merged; new commits pending` (or an equivalent state string).
 - When run inside a specific worktree, highlight that worktree with additional detail while still summarizing the others.
 - Display a per-worktree summary of processes owned by the current user whose working directories (after resolving symlinks) live anywhere within that worktree. Format entries as `command (pid)` separated by commas, include at least three entries when available, and append `+ N more` when truncating to fit within roughly 80 columns. On macOS and Linux this data must be gathered via platform APIs (`/proc` on Linux, `sysctl`/`proc_pidpath` on macOS). Unsupported platforms may omit the column entirely, but supported platforms must fail the command if process discovery fails outright.
 - Output should respect the “silence is golden” philosophy where possible (e.g., avoid gratuitous chatter when nothing noteworthy changed).
@@ -79,6 +89,22 @@
 - Branch status must convey two perspectives without overwhelming the table:
   - Upstream divergence (relative to the branch’s configured upstream, or inferred equivalent) stays as the existing `↑N`/`↓M` markers.
   - Divergence from the configured default branch (e.g., `origin/main`) is shown inline via a short badge appended to the branch column, e.g., `[+5 -2]` when the worktree is five commits ahead and two commits behind the default branch. Omit the badge entirely when both counts are zero.
+
+### Badge Reference (CI + PR)
+
+| Type | Badge Example                       | Meaning                                                       | Notes                                                                                                      |
+|------|-------------------------------------|---------------------------------------------------------------|------------------------------------------------------------------------------------------------------------|
+| CI   | `CI✓`                               | All GitHub check runs succeeded                               | Dense glyph + label, no colon; omit entirely when no workflows target the branch.                          |
+| CI   | `CI◷`                               | Runs queued or in progress                                    | Display until every relevant workflow finishes; keep re-rendering as data streams in.                      |
+| CI   | `CI✗ Pull Request Checks (1m ago)`   | A check failed                                               | Include the failing job/workflow name and relative completion time; show only the highest-severity run.    |
+| CI   | `CI!`                               | Only neutral/skipped conclusions                              | Indicates GitHub reported neutral/skipped results without failures or successes.                           |
+| CI   | `CI? gh error`                      | CI data unavailable                                           | Suffix the surfaced GitHub CLI error (missing auth, rate limits, unsupported remote, etc.).                |
+| PR   | `PR pending`                         | Awaiting PR lookup                                            | Used while PR metadata fetch is outstanding.                                                               |
+| PR   | `PR #42 open`                        | Single open PR attached                                       | Render draft/open/merged/closed states inline (`PR #42 draft`, `PR #42 merged`, etc.).                     |
+| PR   | `PR #99 merged; new commits pending` | Previously merged PR but new commits exist on worktree        | Signals that the worktree diverged again after the PR closed/merged.                                       |
+| PR   | `No PR`                              | No pull request associated                                    | Displayed for both clean branches and worktrees with unique commits but no PR; tidy still lists reasons.   |
+| PR   | `PR multiple (#10, #11, …)`          | Multiple PRs reference the branch                             | Include up to three PR numbers, then `…` to show ambiguity.                                                |
+| PR   | `PR unavailable (gh auth error)`     | PR data fetch failed                                          | Prefix `PR unavailable` with the underlying error cause (auth, network, etc.).                             |
 
 ## Worktree Cleanup (`wt tidy`)
 
@@ -106,9 +132,10 @@
       - `all` auto-cleans both safe and gray.
       - `prompt` prompts for every candidate, including safe ones.
     - Convenience aliases: `--safe`/`-s`, `--all`/`-a`, and `--prompt`/`-p` map to their respective policy values.
-- Prompts render a “mini status panel” for each gray candidate before requesting confirmation. The panel lists PR status, ahead/behind/divergence vs the default branch, last activity timestamp (max of HEAD commit time, PR update time, or worktree mtime), local dirty status, and whether a stash exists.
-- When the prompt panel is shown on an interactive TTY and the worktree is classified as gray with commits ahead of the default branch, immediately below the divergence line display up to roughly ten lines of `git log --oneline --graph --decorate` output for the commits that would be discarded (`git log <branch> --not <default>`). This inline graph keeps the operator from cd’ing into the worktree to remember what the branch contains. Skip this snippet for non-interactive runs, safe candidates, or branches with no ahead commits.
-- While prompting, `y` proceeds with cleanup, `n` skips, and Ctrl+C aborts the entire run.
+  - Prompts render a “mini status panel” for each gray candidate before requesting confirmation. The panel lists PR status, ahead/behind/divergence vs the default branch, last activity timestamp (max of HEAD commit time, PR update time, or worktree mtime), local dirty status, and whether a stash exists.
+  - When the prompt panel is shown on an interactive TTY and the worktree is gray with commits ahead of the default branch, immediately below the divergence line display up to roughly ten lines of `git log --oneline --graph --decorate` output for the commits that would be discarded (`git log <branch> --not <default>`). Skip this snippet for non-interactive runs, safe candidates, or branches with no ahead commits.
+  - The mini panel must reuse the same CI badge/summary shown on the dashboard so operators see identical data regardless of entry point.
+  - While prompting, `y` proceeds with cleanup, `n` skips, and Ctrl+C aborts the entire run.
   - Output must match the status dashboard ergonomics: when stdout is an interactive TTY, render a live table that updates as data (git + GitHub) streams in, reusing the same column layout/renderer used by `wt status`; when stdout is not a TTY, emit a single non-interactive log with grouped sections (“Will clean up/Will prompt/Will skip”) plus progress updates for each worktree as it finishes.
   - Remote/GitHub fetches (PR metadata, other network calls) should kick off in parallel so the UI updates incrementally instead of blocking on each branch sequentially.
 - Gray classification heuristics (all configurable):
@@ -116,6 +143,7 @@
   - More than 20 commits of divergence (ahead or behind) relative to the default branch marks the branch as gray even if it is otherwise clean, since the drift suggests abandonment.
   - Any open PR whose commits have not yet merged into the default branch is gray; `wt tidy` highlights the PR URL/status so the user can make the call.
   - Any branch with multiple PRs (reopened or duplicate heads) is gray because we cannot automatically determine which to close.
+  - Worktrees whose latest CI run failed, or whose CI status is unknown because GitHub data could not be fetched, must be classified as gray so problems are impossible to miss.
 - Worktrees that have active processes in their directory tree must be classified as gray even if they would otherwise be safe; the prompt should reuse the same per-worktree process summary rendered by `wt status`.
 - When `wt tidy` is invoked from inside a worktree that ultimately gets deleted, the command must automatically change directories back to the project root (or another surviving worktree) before removal so the user never loses their active shell.
 - Configuration:
@@ -176,6 +204,7 @@
   - Default behavior: only report problems (no news is good news).
   - `wt doctor` prints a positive confirmation (e.g., “healthy!”) when everything passes.
   - `wt doctor --verbose` lists each check and its result, even when passing.
+- A full `wt doctor` invocation must also confirm the GitHub Actions API is reachable by shelling out to `gh` (e.g., `gh api repos/<owner>/<repo>/actions/runs?per_page=1`). Doctor-lite checks that run automatically before `wt status` may skip this remote call to keep latency low.
 
 ## GitHub Integration
 

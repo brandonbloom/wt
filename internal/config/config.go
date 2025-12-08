@@ -18,6 +18,7 @@ type Config struct {
 	Bootstrap     BootstrapBlock `toml:"bootstrap"`
 	Tidy          TidyBlock      `toml:"tidy"`
 	Process       ProcessBlock   `toml:"process"`
+	CI            CIBlock        `toml:"ci"`
 }
 
 // BootstrapBlock describes commands that run after creating a new worktree.
@@ -93,6 +94,34 @@ func (p ProcessBlock) KillTimeoutDuration() time.Duration {
 	return d
 }
 
+// CIBlock configures how wt discovers GitHub CI metadata.
+type CIBlock struct {
+	Remote string `toml:"remote"`
+}
+
+func (c *CIBlock) applyDefaults() {
+	if c == nil {
+		return
+	}
+	c.Remote = strings.TrimSpace(c.Remote)
+	if c.Remote == "" {
+		c.Remote = "origin"
+	}
+}
+
+// RemoteName returns the configured remote, defaulting to "origin".
+func (c CIBlock) RemoteName() string {
+	if strings.TrimSpace(c.Remote) == "" {
+		return "origin"
+	}
+	return c.Remote
+}
+
+// CIRemote returns the configured remote for CI metadata.
+func (c Config) CIRemote() string {
+	return c.CI.RemoteName()
+}
+
 // StrictEnabled reports whether strict shell options should be enabled.
 func (b BootstrapBlock) StrictEnabled() bool {
 	if b.Strict == nil {
@@ -120,6 +149,7 @@ func Default(defaultBranch string) Config {
 		DefaultBranch: defaultBranch,
 		Bootstrap:     BootstrapBlock{},
 		Process:       ProcessBlock{},
+		CI:            CIBlock{},
 	}
 	cfg.applyDefaults()
 	return cfg
@@ -128,6 +158,7 @@ func Default(defaultBranch string) Config {
 func (c *Config) applyDefaults() {
 	c.Tidy.applyDefaults()
 	c.Process.applyDefaults()
+	c.CI.applyDefaults()
 }
 
 // Validate ensures the configuration can guide wt's behavior.

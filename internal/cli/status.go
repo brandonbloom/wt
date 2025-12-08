@@ -29,6 +29,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	ciRepo, ciRepoErr := resolveGitHubRepo(proj)
 
 	worktrees, err := project.ListWorktrees(proj.Root)
 	if err != nil {
@@ -94,12 +95,39 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	err = fetchPullRequestStatuses(ctx, statuses)
+	var renderer *statusRenderer
+	if isTTY {
+		renderer = newStatusRenderer(out)
+		if renderer != nil {
+			renderer.Render(statuses, layout, now)
+		}
+	}
+	var rerender func(*worktreeStatus)
+	if renderer != nil {
+		rerender = func(*worktreeStatus) {
+			renderer.Render(statuses, layout, now)
+		}
+	}
+
+	err = fetchPullRequestStatuses(ctx, statuses, rerender)
 	if err != nil && errors.Is(err, context.Canceled) {
 		fmt.Fprintln(cmd.ErrOrStderr(), "warning: cancelled GitHub fetch")
 	}
 
-	printStatuses(out, statuses, now, layout)
+	ciOpts := ciFetchOptions{
+		Repo:       ciRepo,
+		RepoErr:    ciRepoErr,
+		RemoteName: proj.Config.CIRemote(),
+		Workdir:    proj.DefaultWorktreePath,
+	}
+	if err := fetchCIStatuses(ctx, ciOpts, statuses, now, rerender); err != nil && errors.Is(err, context.Canceled) {
+		fmt.Fprintln(cmd.ErrOrStderr(), "warning: cancelled GitHub fetch")
+	}
+
+	if renderer == nil {
+		printStatuses(out, statuses, now, layout)
+	}
+	printCIDetail(out, statuses, now)
 
 	return nil
 }
@@ -116,6 +144,7 @@ type worktreeStatus struct {
 	BaseBehind     int
 	UniqueAhead    int
 	Timestamp      time.Time
+	HeadHash       string
 	Current        bool
 	PRStatus       string
 	Operation      string
@@ -125,6 +154,10 @@ type worktreeStatus struct {
 	Error          string
 	HasError       bool
 	HasPendingWork bool
+	PullRequests   []pullRequestInfo
+	CIStatus       string
+	CIState        ciState
+	CIDetail       []ciRunSummary
 }
 
 func collectWorktreeStatus(proj *project.Project, wt project.Worktree) (*worktreeStatus, error) {
@@ -145,6 +178,7 @@ func collectWorktreeStatus(proj *project.Project, wt project.Worktree) (*worktre
 		UniqueAhead: data.UniqueAhead,
 		Timestamp:   data.Timestamp,
 		Operation:   data.Operation,
+		HeadHash:    data.HeadHash,
 	}
 	status.HasPendingWork = hasPendingWork(status.Dirty, status.HasStash, status.UniqueAhead)
 	return status, nil
@@ -327,18 +361,26 @@ func statusFields(status *worktreeStatus, now time.Time, includeSummary bool, pr
 	if !status.Timestamp.IsZero() {
 		relative = timefmt.Relative(status.Timestamp, now)
 	}
-	pr := status.PRStatus
-	if pr == "" {
-		pr = "PR: pending"
+	detail := strings.TrimSpace(status.PRStatus)
+	if status.CIStatus != "" {
+		if detail != "" {
+			detail = fmt.Sprintf("%s · %s", detail, status.CIStatus)
+		} else {
+			detail = status.CIStatus
+		}
 	}
-	if includeSummary && !strings.Contains(strings.ToLower(pr), "processes running:") {
-		summary := summarizeProcesses(status.Processes, defaultProcessSummaryLimit)
-		pr = appendProcessSummary(pr, summary, prWidth)
+	if includeSummary {
+		if summary := summarizeProcesses(status.Processes, defaultProcessSummaryLimit); summary != "" {
+			detail = appendProcessSummary(detail, summary, prWidth)
+		}
+	}
+	if detail == "" {
+		detail = "-"
 	}
 	return [statusColumnCount]string{
 		nameField,
 		relative,
-		pr,
+		detail,
 	}
 }
 
@@ -404,6 +446,12 @@ func appendProcessSummary(pr, summary string, prWidth int) string {
 	}
 	if prWidth <= 0 {
 		prWidth = defaultProcessSummaryLimit
+	}
+	if pr == "" || pr == "-" {
+		if runewidth.StringWidth(summary) > prWidth {
+			return runewidth.Truncate(summary, prWidth, "…")
+		}
+		return summary
 	}
 	sep := " · "
 	baseWidth := runewidth.StringWidth(pr)
@@ -522,10 +570,10 @@ func colorizeParts(parts []string, status *worktreeStatus) {
 		parts[0] = branchColor(parts[0])
 	}
 	parts[1] = colorTimeValue(parts[1])
-	parts[2] = choosePRColor(status)(parts[2])
+	parts[2] = chooseStatusColor(status)(parts[2])
 }
 
-func choosePRColor(status *worktreeStatus) func(a ...interface{}) string {
+func chooseStatusColor(status *worktreeStatus) func(a ...interface{}) string {
 	if status.HasError {
 		return colorPRError
 	}
@@ -535,7 +583,19 @@ func choosePRColor(status *worktreeStatus) func(a ...interface{}) string {
 	if status.NeedsInput {
 		return color.New(color.FgHiRed).SprintFunc()
 	}
-	pr := strings.ToLower(status.PRStatus)
+	switch status.CIState {
+	case ciStateFailure, ciStateError:
+		return colorPRError
+	case ciStatePending:
+		return colorPRPending
+	case ciStateWarning:
+		return colorPROther
+	}
+	return choosePRStringColor(status.PRStatus)
+}
+
+func choosePRStringColor(prText string) func(a ...interface{}) string {
+	pr := strings.ToLower(prText)
 	switch {
 	case strings.Contains(pr, "merged"):
 		return colorPRMerged
@@ -556,6 +616,51 @@ func printStatuses(w io.Writer, statuses []*worktreeStatus, now time.Time, layou
 	}
 }
 
+func printCIDetail(w io.Writer, statuses []*worktreeStatus, now time.Time) {
+	status := currentStatus(statuses)
+	if status == nil || len(status.CIDetail) == 0 {
+		return
+	}
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "CI details (%s):\n", status.Name)
+	for _, run := range status.CIDetail {
+		state := strings.TrimSpace(run.Conclusion)
+		if state == "" {
+			state = strings.TrimSpace(run.Status)
+		}
+		if state == "" {
+			state = "unknown"
+		}
+		fmt.Fprintf(w, "- %s — %s\n", run.Name, state)
+		if times := formatCIDetailTimes(run, now); times != "" {
+			fmt.Fprintf(w, "  %s\n", times)
+		}
+		if run.URL != "" {
+			fmt.Fprintf(w, "  %s\n", run.URL)
+		}
+	}
+}
+
+func formatCIDetailTimes(run ciRunSummary, now time.Time) string {
+	parts := make([]string, 0, 2)
+	if !run.StartedAt.IsZero() {
+		parts = append(parts, fmt.Sprintf("started %s", timefmt.Relative(run.StartedAt, now)))
+	}
+	if !run.CompletedAt.IsZero() {
+		parts = append(parts, fmt.Sprintf("completed %s", timefmt.Relative(run.CompletedAt, now)))
+	}
+	return strings.Join(parts, " · ")
+}
+
+func currentStatus(statuses []*worktreeStatus) *worktreeStatus {
+	for _, status := range statuses {
+		if status.Current {
+			return status
+		}
+	}
+	return nil
+}
+
 func formatStatusLines(statuses []*worktreeStatus, now time.Time, layout columnLayout) []string {
 	lines := make([]string, 0, len(statuses))
 	for _, status := range statuses {
@@ -564,7 +669,7 @@ func formatStatusLines(statuses []*worktreeStatus, now time.Time, layout columnL
 	return lines
 }
 
-func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus) error {
+func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus, onUpdate func(*worktreeStatus)) error {
 	if len(statuses) == 0 {
 		return nil
 	}
@@ -610,13 +715,20 @@ func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus) e
 				}
 				res.status.PRStatus = fmt.Sprintf("PR: unavailable (%s)", msg)
 				combined = errors.Join(combined, fmt.Errorf("%s: %w", res.status.Name, res.err))
+				if onUpdate != nil {
+					onUpdate(res.status)
+				}
 				continue
 			}
+			res.status.PullRequests = append([]pullRequestInfo(nil), res.prs...)
 			summary := summarizePullRequestState(prContext{
 				HasPendingWork:   res.status.HasPendingWork,
 				HasUniqueCommits: res.status.UniqueAhead > 0,
 			}, res.prs)
 			res.status.PRStatus = summary.Column
+			if onUpdate != nil {
+				onUpdate(res.status)
+			}
 		}
 	}
 }

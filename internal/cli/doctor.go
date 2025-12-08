@@ -59,6 +59,7 @@ func runDoctor(cmd *cobra.Command, verbose bool) error {
 			return nil
 		}},
 		{Name: "process detection available", Fn: checkProcessDetection},
+		{Name: "github actions reachable", Fn: checkGitHubActions},
 	}
 
 	var failures []string
@@ -136,4 +137,28 @@ func checkProcessDetection(*doctorContext) error {
 		}
 	}
 	return errors.New("process scanner unavailable (could not observe wt)")
+}
+
+func checkGitHubActions(ctx *doctorContext) error {
+	if ctx.Project == nil {
+		wd, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		proj, err := project.Discover(wd)
+		if err != nil {
+			return err
+		}
+		ctx.Project = proj
+	}
+	repo, err := resolveGitHubRepo(ctx.Project)
+	if err != nil {
+		return err
+	}
+	path := fmt.Sprintf("repos/%s/actions/runs?per_page=1", repo.slug())
+	cmd := exec.Command("gh", "api", path)
+	cmd.Dir = ctx.Project.DefaultWorktreePath
+	cmd.Stdout = io.Discard
+	cmd.Stderr = io.Discard
+	return cmd.Run()
 }

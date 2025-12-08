@@ -160,7 +160,9 @@ Running `wt` with no subcommand prints a status dashboard:
 - Each line shows branch name (only when it differs from the worktree directory), ahead (`↑N`) / behind (`↓M`) counts relative to the worktree’s upstream, dirty indicators, and a divergence badge relative to the default branch. The badge uses `[+N -M]` and is omitted when both counts are zero.
 - Timestamps come from the newest dirty/staged file when the worktree has changes; otherwise they use the HEAD commit timestamp. Values render as friendly relative strings such as `3s ago`, `2 min ago`, or `yesterday 2pm`.
 - If the branch has an associated GitHub pull request, its status appears inline.
+- CI status appears next to the pull-request summary. `CI: ✓` means every GitHub Actions check run succeeded, `CI: ◷` indicates a queued or running workflow, `CI: ✗ <job>` highlights the most relevant failure with a relative timestamp, and `CI: ? …` surfaces problems (missing remotes, unauthenticated `gh`, etc.). The `[ci]` table in `.wt/config.toml` controls which remote wt inspects.
 - On macOS and Linux, the dashboard also lists processes owned by the current user whose `cwd` lives inside the worktree (subdirectories included). Entries render as `command (pid)` separated by commas with truncation when the column runs long. Unsupported platforms simply omit this summary.
+- When you run `wt status` from inside a worktree whose CI failed, a short “CI details” section prints beneath the table with the failing job name, start/completion times, and the run URL so you can jump straight into logs without digging through the Actions UI.
 
 Before collecting git data, the dashboard performs quick “doctor-lite” checks (wrapper active, `.wt` present, default worktree healthy) and surfaces any issues so you’re not looking at stale information.
 

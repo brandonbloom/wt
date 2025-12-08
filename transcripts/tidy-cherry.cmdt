@@ -1,14 +1,14 @@
-$ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new duplicate-pr --base main >/dev/null; cd ../duplicate-pr; echo duplicate >>README.md; git add README.md; git commit -m "duplicate change" >/dev/null; git push -u origin duplicate-pr >/dev/null; cd ../main; cp ../duplicate-pr/README.md README.md; git add README.md; git commit -m "duplicate change (main copy)" >/dev/null; echo upstream >>README.md; git add README.md; git commit -m "upstream change" >/dev/null; printf "%s\n" "duplicate-pr|201|MERGED|false|2000-01-20T00:00:00Z|https://example.com/pr/201" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt tidy -n'
+$ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new duplicate-pr --base main >/dev/null; cd ../duplicate-pr; echo duplicate >>README.md; git add README.md; git commit -m "duplicate change" >/dev/null; git push -u origin duplicate-pr >/dev/null; cd ../main; cp ../duplicate-pr/README.md README.md; git add README.md; git commit -m "duplicate change (main copy)" >/dev/null; echo upstream >>README.md; git add README.md; git commit -m "upstream change" >/dev/null; printf "%s\n" "duplicate-pr|201|MERGED|false|2000-01-20T00:00:00Z|https://example.com/pr/201" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt tidy -n'
 2 To ../remote.git
 2  * [new branch]      main -> main
 2 Preparing worktree (new branch 'duplicate-pr')
 2 To ../remote.git
 2  * [new branch]      duplicate-pr -> duplicate-pr
-1 Will clean up:
+2 warning: unsupported remote URL: ../remote.git
+1 Will prompt for:
 1 - duplicate-pr (branch duplicate-pr)
-1     remove worktree /tmp/wt-transcripts/tmprepo/duplicate-pr
-1     delete local branch duplicate-pr
-1     delete remote branch origin/duplicate-pr
+1     reasons:
+1       * CI status unknown
 1
 1
 1 Remote maintenance:

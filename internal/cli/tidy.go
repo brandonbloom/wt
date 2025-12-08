@@ -90,6 +90,7 @@ func runTidy(cmd *cobra.Command, opts *tidyOptions) error {
 	if err != nil {
 		return err
 	}
+	ciRepo, ciRepoErr := resolveGitHubRepo(proj)
 
 	initialWD, err := os.Getwd()
 	if err != nil {
@@ -135,6 +136,17 @@ func runTidy(cmd *cobra.Command, opts *tidyOptions) error {
 	if err := fetchTidyPullRequests(cmd.Context(), candidates, ui); err != nil && !errors.Is(err, context.Canceled) {
 		fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s\n", singleLineError(err))
 	}
+
+	ciOpts := ciFetchOptions{
+		Repo:       ciRepo,
+		RepoErr:    ciRepoErr,
+		RemoteName: proj.Config.CIRemote(),
+		Workdir:    proj.DefaultWorktreePath,
+	}
+	if err := fetchCIStatuses(cmd.Context(), ciOpts, ui.statuses, now, nil); err != nil && !errors.Is(err, context.Canceled) {
+		fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s\n", singleLineError(err))
+	}
+	updateCandidatesCIState(candidates)
 
 	safe, gray, blocked := classifyCandidates(candidates, now, ui)
 
@@ -229,6 +241,8 @@ type tidyCandidate struct {
 	defaultBranch       string
 	status              *worktreeStatus
 	Processes           []processes.Process
+	CIState             ciState
+	CIStatus            string
 }
 
 func (cand *tidyCandidate) hasPendingWork() bool {
@@ -1134,6 +1148,9 @@ func candidateToStatus(cand *tidyCandidate, now time.Time) *worktreeStatus {
 		BaseAhead:  cand.BaseAhead,
 		BaseBehind: cand.BaseBehind,
 		Timestamp:  cand.LastActivity,
+		HeadHash:   cand.HeadHash,
+		CIStatus:   cand.CIStatus,
+		CIState:    cand.CIState,
 	}
 	populateStatusFromCandidate(cand, status, now)
 	return status
@@ -1149,6 +1166,7 @@ func populateStatusFromCandidate(cand *tidyCandidate, status *worktreeStatus, no
 	status.UniqueAhead = cand.UniqueAhead
 	status.Timestamp = cand.LastActivity
 	status.HasPendingWork = cand.hasPendingWork()
+	status.HeadHash = cand.HeadHash
 	summary := summarizePullRequestState(prContext{
 		HasPendingWork:   status.HasPendingWork,
 		HasUniqueCommits: cand.UniqueAhead > 0,
@@ -1159,12 +1177,58 @@ func populateStatusFromCandidate(cand *tidyCandidate, status *worktreeStatus, no
 	status.Processes = append([]processes.Process(nil), cand.Processes...)
 	status.ProcessWarn = len(cand.Processes) > 0 && cand.Classification != tidySafe
 	status.HasError = cand.Stage == tidyStageBlocked || cand.Stage == tidyStageError
+	status.PullRequests = append([]pullRequestInfo(nil), cand.PRs...)
+	status.CIStatus = cand.CIStatus
+	status.CIState = cand.CIState
+}
+
+func updateCandidatesCIState(candidates []*tidyCandidate) {
+	for _, cand := range candidates {
+		if cand == nil || cand.status == nil {
+			continue
+		}
+		applyCandidateCIState(cand, cand.status)
+	}
+}
+
+func applyCandidateCIState(cand *tidyCandidate, status *worktreeStatus) {
+	removeCIGrayReason(cand)
+	cand.CIState = status.CIState
+	cand.CIStatus = status.CIStatus
+	if reason := ciGrayReason(status.CIState); reason != "" {
+		cand.extraGrayReasons = append(cand.extraGrayReasons, reason)
+	}
+}
+
+func removeCIGrayReason(cand *tidyCandidate) {
+	if cand == nil || len(cand.extraGrayReasons) == 0 {
+		return
+	}
+	filtered := cand.extraGrayReasons[:0]
+	for _, reason := range cand.extraGrayReasons {
+		if strings.HasPrefix(reason, "CI ") {
+			continue
+		}
+		filtered = append(filtered, reason)
+	}
+	cand.extraGrayReasons = filtered
+}
+
+func ciGrayReason(state ciState) string {
+	switch state {
+	case ciStateFailure:
+		return "CI failed"
+	case ciStateError, ciStateUnknown:
+		return "CI status unknown"
+	default:
+		return ""
+	}
 }
 
 func tidyActionLabel(cand *tidyCandidate) string {
 	switch cand.Stage {
 	case tidyStageReady:
-		return "will clean"
+		return ""
 	case tidyStagePrompt:
 		if len(cand.GrayReasons) > 0 {
 			return cand.GrayReasons[0]

@@ -101,6 +101,9 @@ export CLICOLOR=0
 export CLICOLOR_FORCE=0
 
 git init -b main >/dev/null
+if [[ "${WT_SKIP_DEFAULT_ORIGIN:-0}" != "1" ]]; then
+  git remote add origin git@github.com:brandonbloom/wt.git >/dev/null
+fi
 echo hi >README.md
 git add README.md
 git commit -m init >/dev/null
@@ -115,6 +118,11 @@ cat >"${gh_state_file}" <<'EOF'
 demo-branch|42|OPEN|false|2000-01-02T00:00:00Z|https://example.com/pr/42
 merged-branch|99|MERGED|false|2000-01-02T00:00:00Z|https://example.com/pr/99
 EOF
+ci_state_file="${tmprepo}/.gh-ci"
+cat >"${ci_state_file}" <<'EOF'
+commit|*|build|completed|success|https://example.com/run/success|2000-01-02T00:00:00Z|2000-01-02T00:05:00Z
+pr|42|Pull Request Checks|completed|failure|https://example.com/run/pr-42|2000-01-02T23:59:00Z|2000-01-02T23:59:59Z
+EOF
 
 # Install a hermetic gh stub so transcript runs never hit real GitHub.
 mkdir -p bin
@@ -123,6 +131,11 @@ cat >bin/gh <<'EOF'
 set -eu
 
 STATE_FILE="${WT_GH_STATE_FILE:-${PWD}/.gh-prs}"
+CI_FILE="${WT_GH_CI_FILE:-${PWD}/.gh-ci}"
+
+url_decode() {
+  printf '%b' "${1//%/\\x}"
+}
 
 pr_list() {
   branch=""
@@ -198,6 +211,35 @@ pr_close() {
   echo "Closed PR #${number}"
 }
 
+emit_check_runs() {
+  key="$1"
+  fallback=""
+  case "$key" in
+    commit\|*)
+      fallback="commit|*"
+      ;;
+    pr\|*)
+      fallback="pr|*"
+      ;;
+  esac
+  if [ -n "${WT_GH_DEBUG:-}" ]; then
+    echo "ci_key=$key" >>"${CI_FILE}.log"
+  fi
+
+  if [ -f "$CI_FILE" ]; then
+    while IFS='|' read -r entry_type entry_id name status conclusion url started completed; do
+      [ -z "$entry_type" ] && continue
+      entry="${entry_type}|${entry_id}"
+      if [ "$entry" = "$key" ] || { [ -n "$fallback" ] && [ "$entry" = "$fallback" ]; }; then
+        printf '{"total_count":1,"check_runs":[{"name":"%s","status":"%s","conclusion":"%s","html_url":"%s","details_url":"%s","started_at":"%s","completed_at":"%s"}]}\n' \
+          "$name" "$status" "$conclusion" "$url" "$url" "$started" "$completed"
+        return 0
+      fi
+    done <"$CI_FILE"
+  fi
+  echo '{"total_count":0,"check_runs":[]}'
+}
+
 if [ "$#" -lt 1 ]; then
   echo "gh stub: missing subcommand" >&2
   exit 1
@@ -233,6 +275,54 @@ case "$sub" in
       exit 0
     fi
     ;;
+  api)
+    if [ "$#" -lt 1 ]; then
+      echo "gh stub: api requires a path" >&2
+      exit 1
+    fi
+    endpoint="$1"
+    shift
+    base="${endpoint%%\?*}"
+    case "$base" in
+      repos/*/*/commits/*/check-runs)
+        ref_with_tail="${base#repos/}"
+        ref_with_tail="${ref_with_tail#*/}"
+        ref_with_tail="${ref_with_tail#*/}"
+        ref_with_tail="${ref_with_tail#commits/}"
+        ref="${ref_with_tail%/check-runs}"
+        decoded_ref="$(url_decode "$ref")"
+        if [ -n "${WT_GH_DEBUG:-}" ]; then
+          echo "decoded_ref=$decoded_ref" >>"${CI_FILE}.log"
+        fi
+        case "$decoded_ref" in
+          refs/pull/*/merge)
+            pr_num="${decoded_ref#refs/pull/}"
+            pr_num="${pr_num%/merge}"
+            if [ -n "${WT_GH_DEBUG:-}" ]; then
+              echo "pr_num=$pr_num" >>"${CI_FILE}.log"
+            fi
+            emit_check_runs "pr|${pr_num}"
+            exit 0
+            ;;
+          *)
+            emit_check_runs "commit|${decoded_ref}"
+            exit 0
+            ;;
+        esac
+        ;;
+      repos/*/*/actions/runs*)
+        echo '{"total_count":0,"workflow_runs":[]}'
+        exit 0
+        ;;
+    esac
+    ;;
+  run)
+    if [ "${1:-}" = "list" ]; then
+      shift
+      echo '[]'
+      exit 0
+    fi
+    ;;
 esac
 
 echo "gh stub cannot handle: $sub $*" >&2
@@ -241,6 +331,7 @@ EOF
 chmod +x bin/gh
 export PATH="${tmprepo}/bin:${PATH}"
 export WT_GH_STATE_FILE="${gh_state_file}"
+export WT_GH_CI_FILE="${ci_state_file}"
 
 if [[ $activate_wrapper -eq 1 ]]; then
   export WT_WRAPPER_ACTIVE=1

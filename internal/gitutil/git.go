@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -23,6 +24,76 @@ func Run(dir string, args ...string) (string, error) {
 		return "", fmt.Errorf("git %s: %v\n%s", strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
 	}
 	return strings.TrimSpace(stdout.String()), nil
+}
+
+// RemoteURL returns the configured URL for the given remote name.
+func RemoteURL(dir, remote string) (string, error) {
+	if strings.TrimSpace(remote) == "" {
+		remote = "origin"
+	}
+	out, err := Run(dir, "remote", "get-url", remote)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
+// ParseGitHubRemote extracts owner/repo from a GitHub remote URL.
+func ParseGitHubRemote(raw string) (string, string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", "", errors.New("empty remote URL")
+	}
+	trimmed = strings.TrimSuffix(trimmed, ".git")
+
+	var host, path string
+	switch {
+	case strings.HasPrefix(trimmed, "git@"):
+		parts := strings.SplitN(strings.TrimPrefix(trimmed, "git@"), ":", 2)
+		if len(parts) != 2 {
+			return "", "", fmt.Errorf("invalid ssh remote: %s", raw)
+		}
+		host = parts[0]
+		path = parts[1]
+	case strings.HasPrefix(trimmed, "ssh://"):
+		u, err := url.Parse(trimmed)
+		if err != nil {
+			return "", "", err
+		}
+		host = u.Hostname()
+		path = strings.TrimPrefix(u.Path, "/")
+	case strings.HasPrefix(trimmed, "https://") || strings.HasPrefix(trimmed, "http://"):
+		u, err := url.Parse(trimmed)
+		if err != nil {
+			return "", "", err
+		}
+		host = u.Hostname()
+		path = strings.TrimPrefix(u.Path, "/")
+	default:
+		// treat as bare <host>:<path>?
+		if strings.Contains(trimmed, ":") {
+			parts := strings.SplitN(trimmed, ":", 2)
+			host = parts[0]
+			path = parts[1]
+		} else {
+			return "", "", fmt.Errorf("unsupported remote URL: %s", raw)
+		}
+	}
+
+	if !strings.EqualFold(host, "github.com") {
+		return "", "", fmt.Errorf("remote host %s is not github.com", host)
+	}
+
+	segments := strings.Split(path, "/")
+	if len(segments) < 2 {
+		return "", "", fmt.Errorf("invalid GitHub remote path: %s", path)
+	}
+	owner := segments[0]
+	repo := segments[1]
+	if owner == "" || repo == "" {
+		return "", "", fmt.Errorf("invalid GitHub remote: %s", raw)
+	}
+	return owner, repo, nil
 }
 
 // CurrentBranch reports the checked-out branch name for a worktree.

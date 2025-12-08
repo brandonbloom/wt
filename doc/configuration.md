@@ -8,6 +8,9 @@ default_branch = "main"
 [bootstrap]
 run = "mise run deps"
 # strict = false
+
+[ci]
+# remote = "origin"
 ```
 
 ## `default_branch`
@@ -66,6 +69,16 @@ Controls process cleanup defaults shared by `wt kill` and `wt tidy --kill`.
 - Type: duration string (default `"3s"`).
 - Determines how long the commands wait for a process to exit after sending the signal. Values follow Go’s duration syntax (`500ms`, `2s`, `1m30s`, etc.).
 - `wt kill --timeout` and `wt tidy --kill --timeout` override this per invocation.
+
+## `[ci]` Table
+
+Controls how wt discovers GitHub CI metadata for the dashboard and tidy prompts.
+
+### `remote`
+
+- Type: string (default `"origin"`).
+- Specifies which git remote contains the canonical GitHub repository. `wt status`, `wt tidy`, and `wt rm` shell out to `gh` against this remote to fetch check runs and workflow information.
+- Override the default when your local clone uses a different remote name (e.g., `upstream`). Projects with mirrored repositories can point wt at whichever remote GitHub hosts.
 
 ## Editing Tips
 

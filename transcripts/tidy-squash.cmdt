@@ -1,14 +1,14 @@
-$ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new squash-branch --base main >/dev/null; cd ../squash-branch; echo squash >>README.md; git add README.md; git commit -m "squash change" >/dev/null; git push -u origin squash-branch >/dev/null; cd ../main; git merge --squash squash-branch >/dev/null; git commit -m "squashed merge" >/dev/null; printf "%s\n" "squash-branch|201|MERGED|false|2000-01-20T00:00:00Z|https://example.com/pr/201" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt tidy -n'
+$ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new squash-branch --base main >/dev/null; cd ../squash-branch; echo squash >>README.md; git add README.md; git commit -m "squash change" >/dev/null; git push -u origin squash-branch >/dev/null; cd ../main; git merge --squash squash-branch >/dev/null; git commit -m "squashed merge" >/dev/null; printf "%s\n" "squash-branch|201|MERGED|false|2000-01-20T00:00:00Z|https://example.com/pr/201" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt tidy -n'
 2 To ../remote.git
 2  * [new branch]      main -> main
 2 Preparing worktree (new branch 'squash-branch')
 2 To ../remote.git
 2  * [new branch]      squash-branch -> squash-branch
-1 Will clean up:
+2 warning: unsupported remote URL: ../remote.git
+1 Will prompt for:
 1 - squash-branch (branch squash-branch)
-1     remove worktree /tmp/wt-transcripts/tmprepo/squash-branch
-1     delete local branch squash-branch
-1     delete remote branch origin/squash-branch
+1     reasons:
+1       * CI status unknown
 1
 1
 1 Remote maintenance:

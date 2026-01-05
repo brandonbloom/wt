@@ -26,7 +26,7 @@ type worktreeGitData struct {
 	TreeMatchesDefault bool
 }
 
-func gatherWorktreeGitData(proj *project.Project, wt project.Worktree) (*worktreeGitData, error) {
+func gatherWorktreeGitData(proj *project.Project, wt project.Worktree, defaultCompareRef string) (*worktreeGitData, error) {
 	data := &worktreeGitData{Worktree: wt}
 
 	branch, err := gitutil.CurrentBranch(wt.Path)
@@ -86,19 +86,24 @@ func gatherWorktreeGitData(proj *project.Project, wt project.Worktree) (*worktre
 	}
 	data.HeadHash = headHash
 
-	merged, err := gitutil.HeadMergedInto(wt.Path, proj.Config.DefaultBranch)
+	compareRef := defaultCompareRef
+	if compareRef == "" {
+		compareRef = proj.Config.DefaultBranch
+	}
+
+	merged, err := gitutil.HeadMergedInto(wt.Path, compareRef)
 	if err != nil {
 		return nil, err
 	}
 	data.MergedIntoDefault = merged
 
-	treeMatches, err := gitutil.HeadSameTree(wt.Path, proj.Config.DefaultBranch)
+	treeMatches, err := gitutil.HeadSameTree(wt.Path, compareRef)
 	if err != nil {
 		return nil, err
 	}
 	data.TreeMatchesDefault = treeMatches
 
-	uniqueAhead, err := gitutil.UniqueCommitsComparedTo(wt.Path, proj.Config.DefaultBranch)
+	uniqueAhead, err := gitutil.UniqueCommitsComparedTo(wt.Path, compareRef)
 	if err != nil {
 		return nil, err
 	}

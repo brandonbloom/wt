@@ -90,6 +90,7 @@ func runTidy(cmd *cobra.Command, opts *tidyOptions) error {
 	if err != nil {
 		return err
 	}
+	defaultCompareRef := defaultBranchComparisonRef(proj)
 	ciRepo, ciRepoErr := resolveGitHubRepo(proj)
 
 	initialWD, err := os.Getwd()
@@ -122,7 +123,7 @@ func runTidy(cmd *cobra.Command, opts *tidyOptions) error {
 	}
 
 	now := currentTimeOverride()
-	candidates, err := collectTidyCandidates(cmd.Context(), proj, now)
+	candidates, err := collectTidyCandidates(cmd.Context(), proj, defaultCompareRef, now)
 	if err != nil {
 		return err
 	}
@@ -260,7 +261,7 @@ const (
 	tidyGray
 )
 
-func collectTidyCandidates(ctx context.Context, proj *project.Project, now time.Time) ([]*tidyCandidate, error) {
+func collectTidyCandidates(ctx context.Context, proj *project.Project, defaultCompareRef string, now time.Time) ([]*tidyCandidate, error) {
 	worktrees, err := project.ListWorktrees(proj.Root)
 	if err != nil {
 		return nil, err
@@ -277,7 +278,7 @@ func collectTidyCandidates(ctx context.Context, proj *project.Project, now time.
 		if wt.Name == proj.DefaultWorktree {
 			continue
 		}
-		cand, err := inspectWorktreeBase(ctx, proj, wt, wd)
+		cand, err := inspectWorktreeBase(ctx, proj, wt, wd, defaultCompareRef)
 		if err != nil {
 			return nil, err
 		}
@@ -295,14 +296,14 @@ func collectTidyCandidates(ctx context.Context, proj *project.Project, now time.
 	return base, nil
 }
 
-func inspectWorktreeBase(ctx context.Context, proj *project.Project, wt project.Worktree, wd string) (*tidyCandidate, error) {
+func inspectWorktreeBase(ctx context.Context, proj *project.Project, wt project.Worktree, wd string, defaultCompareRef string) (*tidyCandidate, error) {
 	cand := &tidyCandidate{
 		Worktree:      wt,
 		Stage:         tidyStageScanning,
 		defaultBranch: proj.Config.DefaultBranch,
 	}
 
-	data, err := gatherWorktreeGitData(proj, wt)
+	data, err := gatherWorktreeGitData(proj, wt, defaultCompareRef)
 	if err != nil {
 		cand.Branch = "(unknown)"
 		return markTidyGitError(cand, err)

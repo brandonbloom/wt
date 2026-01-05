@@ -2,7 +2,7 @@ $ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'set -e; cd main; expo
 2 Preparing worktree (new branch 'no-pr')
 2 Preparing worktree (new branch 'merged-plus')
 1   main                     Jan 1              No PR · CI✓                                                                     
-1   merged-plus              Jan 1              PR #200 merged; new commits pending · CI✓                                       
+1   merged-plus              Jan 1              PR #200 merged; unpublished commits · CI✓                                       
 1 * no-pr                    Jan 1              No PR · CI✓                                                                     
 
 $ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'set -e; cd main; export PATH="$(pwd)/../bin:$PATH"; ../../bin/wt new no-pr --base main >/dev/null; cd ../no-pr; echo solo >>README.md; git add README.md; git commit -m "solo work" >/dev/null; cd ../main; ../../bin/wt new merged-plus --base main >/dev/null; cd ../merged-plus; echo merge >>README.md; git add README.md; git commit -m "merge work" >/dev/null; cd ../main; printf "merged-plus|200|MERGED|false|2000-01-15T00:00:00Z|https://example.com/pr/200\n" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt tidy --dry-run'
@@ -12,7 +12,7 @@ $ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'set -e; cd main; expo
 1 - merged-plus (branch merged-plus)
 1     reasons:
 1       * commits not merged into main
-1       * PR #200 merged; new commits pending
+1       * PR #200 merged; unpublished commits
 1       * stale for 17 days
 1 - no-pr (branch no-pr)
 1     reasons:

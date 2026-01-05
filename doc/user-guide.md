@@ -73,6 +73,8 @@ Use this when dependencies drift or you need to reapply setup steps after `wt ne
 - **Gray** – Clean but requires human judgment (e.g., diverged more than the configured threshold, stale activity, unique commits not merged yet, ambiguous PR state, or active processes still running inside the worktree).
 - **Blocked** – Local changes, stash entries, multiple worktrees per branch, or other situations that guarantee data loss. These are never touched; `wt tidy` prints guidance instead.
 
+Default branch comparisons are workflow-aware: if `origin/<default_branch>` exists locally and your local default branch is not ahead of it, wt treats `origin/<default_branch>` as the source of truth for “merged / unique commits” checks. If your local default branch is ahead of `origin/<default_branch>` (or the remote-tracking ref is missing), wt treats the local default branch as the source of truth.
+
 Cleanup (for safe items or approved gray ones) removes the worktree directory, deletes the local and remote branches, closes the associated PR via `gh pr close --comment '...tidy...'`, and finally runs `git remote prune origin` once to drop stale refs.
 
 ### Flags & Policies

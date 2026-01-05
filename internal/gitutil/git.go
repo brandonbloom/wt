@@ -31,11 +31,34 @@ func RemoteURL(dir, remote string) (string, error) {
 	if strings.TrimSpace(remote) == "" {
 		remote = "origin"
 	}
+	if url, ok, err := gitConfigGet(dir, fmt.Sprintf("remote.%s.url", remote)); err != nil {
+		return "", err
+	} else if ok && strings.TrimSpace(url) != "" {
+		return strings.TrimSpace(url), nil
+	}
+
+	// Fall back to `git remote get-url` for repositories that define remotes
+	// in a non-standard way, even though it can be affected by url.insteadOf.
 	out, err := Run(dir, "remote", "get-url", remote)
 	if err != nil {
 		return "", err
 	}
 	return strings.TrimSpace(out), nil
+}
+
+func gitConfigGet(dir, key string) (string, bool, error) {
+	cmd := exec.Command("git", "-C", dir, "config", "--get", key)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+			return "", false, nil
+		}
+		return "", false, fmt.Errorf("git config --get %s: %v\n%s", key, err, strings.TrimSpace(stderr.String()))
+	}
+	return strings.TrimSpace(stdout.String()), true, nil
 }
 
 // ParseGitHubRemote extracts owner/repo from a GitHub remote URL.
@@ -355,6 +378,63 @@ func AheadBehindDefaultBranch(dir, defaultBranch string) (ahead, behind int, err
 		return 0, 0, nil
 	}
 	return aheadBehindAgainstRef(dir, fmt.Sprintf("%s/%s", remote, defaultBranch))
+}
+
+type DefaultBranchSyncMode string
+
+const (
+	DefaultBranchLocalFirst  DefaultBranchSyncMode = "local"
+	DefaultBranchRemoteFirst DefaultBranchSyncMode = "remote"
+)
+
+// DefaultBranchComparisonRef selects the ref that should act as the "default
+// branch" for safety checks when a repository may be operated in either a local-
+// first or remote-first workflow.
+//
+// Policy:
+// - If refs/remotes/<remote>/<defaultBranch> is missing, return <defaultBranch>
+//   (local-first).
+// - If the local default branch is ahead of the remote-tracking default branch,
+//   return <defaultBranch> (local-first).
+// - Otherwise return <remote>/<defaultBranch> (remote-first).
+func DefaultBranchComparisonRef(dir, remote, defaultBranch string) (string, DefaultBranchSyncMode, error) {
+	defaultBranch = strings.TrimSpace(defaultBranch)
+	if defaultBranch == "" {
+		return "", DefaultBranchLocalFirst, nil
+	}
+	remote = strings.TrimSpace(remote)
+	if remote == "" {
+		remote = "origin"
+	}
+
+	remoteFullRef := fmt.Sprintf("refs/remotes/%s/%s", remote, defaultBranch)
+	if !gitRefExists(dir, remoteFullRef) {
+		return defaultBranch, DefaultBranchLocalFirst, nil
+	}
+	localFullRef := fmt.Sprintf("refs/heads/%s", defaultBranch)
+	if !gitRefExists(dir, localFullRef) {
+		return fmt.Sprintf("%s/%s", remote, defaultBranch), DefaultBranchRemoteFirst, nil
+	}
+
+	out, err := Run(dir, "rev-list", "--left-right", "--count", fmt.Sprintf("%s/%s...%s", remote, defaultBranch, defaultBranch))
+	if err != nil {
+		// If we can't determine which side is ahead, prefer the remote-first view
+		// to avoid treating unpushed work as integrated by accident.
+		return fmt.Sprintf("%s/%s", remote, defaultBranch), DefaultBranchRemoteFirst, nil
+	}
+
+	fields := strings.Fields(out)
+	if len(fields) != 2 {
+		return "", DefaultBranchLocalFirst, fmt.Errorf("unexpected rev-list output: %s", out)
+	}
+	localAhead, err := strconv.Atoi(fields[1])
+	if err != nil {
+		return "", DefaultBranchLocalFirst, err
+	}
+	if localAhead > 0 {
+		return defaultBranch, DefaultBranchLocalFirst, nil
+	}
+	return fmt.Sprintf("%s/%s", remote, defaultBranch), DefaultBranchRemoteFirst, nil
 }
 
 func aheadBehindAgainstRef(dir, ref string) (ahead, behind int, err error) {

@@ -45,6 +45,7 @@ func runRm(cmd *cobra.Command, opts *rmOptions, args []string) error {
 	if err != nil {
 		return err
 	}
+	defaultCompareRef := defaultBranchComparisonRef(proj)
 	ciRepo, ciRepoErr := resolveGitHubRepo(proj)
 
 	initialWD, err := os.Getwd()
@@ -63,7 +64,7 @@ func runRm(cmd *cobra.Command, opts *rmOptions, args []string) error {
 	}
 
 	now := currentTimeOverride()
-	candidates, err := collectTidyCandidates(cmd.Context(), proj, now)
+	candidates, err := collectTidyCandidates(cmd.Context(), proj, defaultCompareRef, now)
 	if err != nil {
 		return err
 	}

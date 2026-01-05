@@ -29,6 +29,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	defaultCompareRef := defaultBranchComparisonRef(proj)
 	ciRepo, ciRepoErr := resolveGitHubRepo(proj)
 
 	worktrees, err := project.ListWorktrees(proj.Root)
@@ -52,7 +53,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	now := currentTimeOverride()
 	statuses := make([]*worktreeStatus, 0, len(worktrees))
 	for _, wt := range worktrees {
-		status, err := collectWorktreeStatus(proj, wt)
+		status, err := collectWorktreeStatus(proj, wt, defaultCompareRef)
 		if err != nil {
 			msg := singleLineError(err)
 			if friendly, ok := friendlyWorktreeGitError(wt.Name, err); ok {
@@ -160,8 +161,8 @@ type worktreeStatus struct {
 	CIDetail       []ciRunSummary
 }
 
-func collectWorktreeStatus(proj *project.Project, wt project.Worktree) (*worktreeStatus, error) {
-	data, err := gatherWorktreeGitData(proj, wt)
+func collectWorktreeStatus(proj *project.Project, wt project.Worktree, defaultCompareRef string) (*worktreeStatus, error) {
+	data, err := gatherWorktreeGitData(proj, wt, defaultCompareRef)
 	if err != nil {
 		return nil, err
 	}

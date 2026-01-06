@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/url"
 	"os/exec"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -64,6 +65,8 @@ type ciFetchOptions struct {
 }
 
 type ciRequest struct {
+	key      string
+	priority int
 	target   ciTarget
 	statuses []*worktreeStatus
 }
@@ -99,7 +102,7 @@ func fetchCIStatuses(ctx context.Context, opts ciFetchOptions, statuses []*workt
 	}
 
 	keyed := make(map[string]*ciRequest)
-	for _, status := range statuses {
+	for idx, status := range statuses {
 		target, err := determineCITarget(status)
 		if err != nil {
 			setCIError(status, fmt.Sprintf("CI: ? %s", err.Error()), ciStateError)
@@ -111,8 +114,10 @@ func fetchCIStatuses(ctx context.Context, opts ciFetchOptions, statuses []*workt
 		key := fmt.Sprintf("%s|%s|%s", opts.Repo.slug(), target.Ref, target.Branch)
 		req := keyed[key]
 		if req == nil {
-			req = &ciRequest{target: target}
+			req = &ciRequest{key: key, priority: idx, target: target}
 			keyed[key] = req
+		} else if idx < req.priority {
+			req.priority = idx
 		}
 		req.statuses = append(req.statuses, status)
 	}
@@ -121,11 +126,22 @@ func fetchCIStatuses(ctx context.Context, opts ciFetchOptions, statuses []*workt
 		return nil
 	}
 
-	results := make(chan ciFetchResult, len(keyed))
+	ordered := make([]*ciRequest, 0, len(keyed))
+	for _, req := range keyed {
+		ordered = append(ordered, req)
+	}
+	sort.SliceStable(ordered, func(i, j int) bool {
+		if ordered[i].priority == ordered[j].priority {
+			return ordered[i].key < ordered[j].key
+		}
+		return ordered[i].priority < ordered[j].priority
+	})
+
+	results := make(chan ciFetchResult, len(ordered))
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, 4)
 
-	for _, req := range keyed {
+	for _, req := range ordered {
 		req := req
 		wg.Add(1)
 		sem <- struct{}{}
@@ -146,22 +162,38 @@ func fetchCIStatuses(ctx context.Context, opts ciFetchOptions, statuses []*workt
 	}()
 
 	var combined error
+	pending := make(map[string]ciFetchResult, len(ordered))
+	next := 0
 	for res := range results {
-		if res.err != nil {
-			combined = errors.Join(combined, res.err)
-			msg := formatCIErrorLabel(res.err)
-			for _, status := range res.req.statuses {
-				setCIError(status, msg, ciStateError)
+		if res.req != nil {
+			pending[res.req.key] = res
+		}
+
+		for next < len(ordered) {
+			req := ordered[next]
+			ready, ok := pending[req.key]
+			if !ok {
+				break
+			}
+			delete(pending, req.key)
+			next++
+
+			if ready.err != nil {
+				combined = errors.Join(combined, ready.err)
+				msg := formatCIErrorLabel(ready.err)
+				for _, status := range req.statuses {
+					setCIError(status, msg, ciStateError)
+					if onUpdate != nil {
+						onUpdate(status)
+					}
+				}
+				continue
+			}
+			for _, status := range req.statuses {
+				applyCIResult(status, ready.result, now)
 				if onUpdate != nil {
 					onUpdate(status)
 				}
-			}
-			continue
-		}
-		for _, status := range res.req.statuses {
-			applyCIResult(status, res.result, now)
-			if onUpdate != nil {
-				onUpdate(status)
 			}
 		}
 	}

@@ -20,6 +20,8 @@ func newActivateCommand() *cobra.Command {
 
 const wrapperScript = `# wt shell integration
 wt() {
+  : "wt shell wrapper v1 (https://github.com/brandonbloom/wt)"
+  : "hint: run 'type -a wt' to see what 'command wt' will execute"
   local _wt_tmp
   _wt_tmp="$(mktemp "${TMPDIR:-/tmp}/wt.XXXXXX")" || return 1
   WT_WRAPPER_ACTIVE=1 WT_INSTRUCTION_FILE="$_wt_tmp" command wt "$@"

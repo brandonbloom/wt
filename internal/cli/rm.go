@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/brandonbloom/wt/internal/project"
@@ -87,6 +88,18 @@ func runRm(cmd *cobra.Command, opts *rmOptions, args []string) error {
 		targetCands = append(targetCands, cand)
 	}
 
+	forcedReasons := make(map[string][]string)
+	if opts.force {
+		for _, cand := range targetCands {
+			if cand == nil || len(cand.BlockReasons) == 0 {
+				continue
+			}
+			forcedReasons[cand.Worktree.Name] = append([]string(nil), cand.BlockReasons...)
+			cand.BlockReasons = nil
+			cand.Stage = tidyStageScanning
+		}
+	}
+
 	if err := attachProcessesToCandidates(targetCands); err != nil {
 		return err
 	}
@@ -162,7 +175,13 @@ func runRm(cmd *cobra.Command, opts *rmOptions, args []string) error {
 			}
 		}
 
-		touched, err := performCleanup(cmd.Context(), logWriter, proj, cand)
+		if opts.force {
+			if reasons := forcedReasons[cand.Worktree.Name]; len(reasons) > 0 {
+				fmt.Fprintf(cmd.ErrOrStderr(), "warning: forcing removal of %s: %s\n", cand.Worktree.Name, strings.Join(reasons, "; "))
+			}
+		}
+
+		touched, err := performRmCleanup(cmd.Context(), cmd.ErrOrStderr(), logWriter, proj, cand, opts.force)
 		if err != nil {
 			return err
 		}
@@ -178,6 +197,100 @@ func runRm(cmd *cobra.Command, opts *rmOptions, args []string) error {
 	}
 	if manualCd {
 		fmt.Fprintf(logWriter, "Removed %s; run `cd %s` to leave the deleted worktree\n", manualCdTarget, proj.Root)
+	}
+	return nil
+}
+
+func performRmCleanup(ctx context.Context, warn io.Writer, log io.Writer, proj *project.Project, cand *tidyCandidate, force bool) (bool, error) {
+	if cand == nil {
+		return false, nil
+	}
+	if log != nil {
+		fmt.Fprintf(log, "Cleaning %s (branch %s)\n", cand.Worktree.Name, cand.Branch)
+	}
+
+	err := gitWorktreeRemove(proj.DefaultWorktreePath, cand.Worktree.Path, log)
+	if err != nil && force {
+		fmt.Fprintf(warn, "warning: git worktree remove failed for %s: %s\n", cand.Worktree.Name, singleLineError(err))
+		fmt.Fprintf(warn, "warning: falling back to rm -rf for %s\n", cand.Worktree.Name)
+		if rmErr := rmRfWorktree(proj, cand.Worktree.Path); rmErr != nil {
+			return false, rmErr
+		}
+		if pruneErr := runGit(proj.DefaultWorktreePath, nil, "worktree", "prune"); pruneErr != nil {
+			fmt.Fprintf(warn, "warning: git worktree prune failed: %s\n", singleLineError(pruneErr))
+		}
+		err = nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	branch := cand.Branch
+	if branch == "" || branch == "HEAD" || branch == proj.Config.DefaultBranch {
+		if force && branch == proj.Config.DefaultBranch {
+			fmt.Fprintf(warn, "warning: skipped deleting local branch %s (default branch)\n", branch)
+		}
+		return false, nil
+	}
+
+	remoteTouched := false
+
+	if err := gitDeleteLocalBranch(proj.DefaultWorktreePath, branch, log); err != nil {
+		if !force {
+			return remoteTouched, err
+		}
+		fmt.Fprintf(warn, "warning: failed to delete local branch %s: %s\n", branch, singleLineError(err))
+	}
+
+	if cand.HasRemoteBranch && cand.RemoteMatchesHead {
+		if err := gitDeleteRemoteBranch(proj.DefaultWorktreePath, branch, log); err != nil {
+			if !force {
+				return remoteTouched, err
+			}
+			fmt.Fprintf(warn, "warning: failed to delete remote branch origin/%s: %s\n", branch, singleLineError(err))
+		} else {
+			remoteTouched = true
+		}
+	}
+
+	return remoteTouched, nil
+}
+
+func rmRfWorktree(proj *project.Project, worktreePath string) error {
+	if proj == nil {
+		return fmt.Errorf("rm -rf refused: missing project")
+	}
+	root := canonicalizePath(proj.Root)
+	if root == "" {
+		return fmt.Errorf("rm -rf refused: missing project root")
+	}
+	wt := canonicalizePath(worktreePath)
+	if wt == "" {
+		return fmt.Errorf("rm -rf refused: missing worktree path")
+	}
+
+	if _, err := os.Stat(filepath.Join(root, ".wt")); err != nil {
+		return fmt.Errorf("rm -rf refused: missing .wt directory at %s", root)
+	}
+
+	if !isWithin(wt, root) {
+		return fmt.Errorf("rm -rf refused: %s is outside project root %s", wt, root)
+	}
+	if filepath.Dir(wt) != root {
+		return fmt.Errorf("rm -rf refused: %s is not an immediate child of project root %s", wt, root)
+	}
+	if wt == canonicalizePath(proj.DefaultWorktreePath) {
+		return fmt.Errorf("rm -rf refused: %s is the default worktree", wt)
+	}
+	if filepath.Base(wt) == ".wt" {
+		return fmt.Errorf("rm -rf refused: target is .wt")
+	}
+
+	if err := makeTreeWritable(wt); err != nil {
+		return fmt.Errorf("reset permissions: %w", err)
+	}
+	if err := os.RemoveAll(wt); err != nil {
+		return fmt.Errorf("rm -rf failed for %s: %w", wt, err)
 	}
 	return nil
 }

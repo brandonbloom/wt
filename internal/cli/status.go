@@ -110,7 +110,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	err = fetchPullRequestStatuses(ctx, statuses, rerender)
+	err = fetchPullRequestStatuses(ctx, statuses, proj.DefaultWorktree, rerender)
 	if err != nil && errors.Is(err, context.Canceled) {
 		fmt.Fprintln(cmd.ErrOrStderr(), "warning: cancelled GitHub fetch")
 	}
@@ -666,7 +666,7 @@ func formatStatusLines(statuses []*worktreeStatus, now time.Time, layout columnL
 	return lines
 }
 
-func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus, onUpdate func(*worktreeStatus)) error {
+func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus, defaultWorktree string, onUpdate func(*worktreeStatus)) error {
 	if len(statuses) == 0 {
 		return nil
 	}
@@ -675,6 +675,25 @@ func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus, o
 		status *worktreeStatus
 		prs    []pullRequestInfo
 		err    error
+	}
+
+	ordered := make([]*worktreeStatus, 0, len(statuses))
+	if defaultWorktree != "" {
+		for _, status := range statuses {
+			if status != nil && status.Name == defaultWorktree {
+				ordered = append(ordered, status)
+				break
+			}
+		}
+	}
+	for _, status := range statuses {
+		if status == nil {
+			continue
+		}
+		if defaultWorktree != "" && status.Name == defaultWorktree {
+			continue
+		}
+		ordered = append(ordered, status)
 	}
 
 	results := make(chan prResult, len(statuses))
@@ -697,6 +716,8 @@ func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus, o
 	}()
 
 	var combined error
+	pending := make(map[*worktreeStatus]prResult, len(statuses))
+	next := 0
 	for {
 		select {
 		case <-ctx.Done():
@@ -709,26 +730,39 @@ func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus, o
 			if !ok {
 				return combined
 			}
-			if res.err != nil {
-				msg := singleLineError(res.err)
-				if msg == "" {
-					msg = "error"
-				}
-				res.status.PRStatus = fmt.Sprintf("PR: unavailable (%s)", msg)
-				combined = errors.Join(combined, fmt.Errorf("%s: %w", res.status.Name, res.err))
-				if onUpdate != nil {
-					onUpdate(res.status)
-				}
-				continue
+			if res.status != nil {
+				pending[res.status] = res
 			}
-			res.status.PullRequests = append([]pullRequestInfo(nil), res.prs...)
-			summary := summarizePullRequestState(prContext{
-				HasPendingWork:   res.status.HasPendingWork,
-				HasUniqueCommits: res.status.UniqueAhead > 0,
-			}, res.prs)
-			res.status.PRStatus = summary.Column
-			if onUpdate != nil {
-				onUpdate(res.status)
+			for next < len(ordered) {
+				status := ordered[next]
+				prRes, ready := pending[status]
+				if !ready {
+					break
+				}
+				delete(pending, status)
+				next++
+
+				if prRes.err != nil {
+					msg := singleLineError(prRes.err)
+					if msg == "" {
+						msg = "error"
+					}
+					status.PRStatus = fmt.Sprintf("PR: unavailable (%s)", msg)
+					combined = errors.Join(combined, fmt.Errorf("%s: %w", status.Name, prRes.err))
+					if onUpdate != nil {
+						onUpdate(status)
+					}
+					continue
+				}
+				status.PullRequests = append([]pullRequestInfo(nil), prRes.prs...)
+				summary := summarizePullRequestState(prContext{
+					HasPendingWork:   status.HasPendingWork,
+					HasUniqueCommits: status.UniqueAhead > 0,
+				}, prRes.prs)
+				status.PRStatus = summary.Column
+				if onUpdate != nil {
+					onUpdate(status)
+				}
 			}
 		}
 	}

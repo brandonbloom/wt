@@ -589,11 +589,6 @@ func plannedActions(cand *tidyCandidate) []string {
 			actions = append(actions, fmt.Sprintf("skip remote branch origin/%s (tip changed)", cand.Branch))
 		}
 	}
-	for _, pr := range cand.PRs {
-		if pr.Open() {
-			actions = append(actions, fmt.Sprintf("close PR #%d", pr.Number))
-		}
-	}
 	return actions
 }
 
@@ -928,18 +923,6 @@ func performCleanup(ctx context.Context, log io.Writer, proj *project.Project, c
 			remoteTouched = true
 		} else if log != nil {
 			fmt.Fprintf(log, "  skipped remote branch origin/%s (tip changed)\n", cand.Branch)
-		}
-	}
-
-	for _, pr := range cand.PRs {
-		if !pr.Open() {
-			continue
-		}
-		if err := closePullRequest(ctx, proj.DefaultWorktreePath, cand.Branch, pr.Number); err != nil {
-			return remoteTouched, err
-		}
-		if log != nil {
-			fmt.Fprintf(log, "  closed PR #%d\n", pr.Number)
 		}
 	}
 

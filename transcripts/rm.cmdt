@@ -28,7 +28,6 @@ $ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main
 1   removed worktree /tmp/wt-transcripts/tmprepo/pruned-branch
 1   deleted local branch pruned-branch
 1   remote branch origin/pruned-branch already deleted
-1   closed PR #311
 1 Pruning origin
 1 URL: ../remote.git
 1  * [pruned] origin/pruned-branch
@@ -60,7 +59,6 @@ $ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main
 1 To ../remote.git
 1  - [deleted]         gray-branch
 1   deleted remote branch origin/gray-branch
-1   closed PR #302
 1 Pruned remote origin
 
 $ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new force-branch --base main >/dev/null; cd ../force-branch; echo force >>README.md; git add README.md; GIT_AUTHOR_DATE=2000-01-30T00:00:00Z GIT_COMMITTER_DATE=2000-01-30T00:00:00Z git commit -m "force change" >/dev/null; git push -u origin force-branch >/dev/null; printf "%s\n" "force-branch|303|OPEN|false|2000-01-30T00:00:00Z|https://example.com/pr/303" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt rm -f'
@@ -75,7 +73,6 @@ $ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main
 1 To ../remote.git
 1  - [deleted]         force-branch
 1   deleted remote branch origin/force-branch
-1   closed PR #303
 1 Pruned remote origin
 1 Removed force-branch; run `cd /tmp/wt-transcripts/tmprepo` to leave the deleted worktree
 
@@ -89,7 +86,6 @@ $ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main
 1   - remove worktree /tmp/wt-transcripts/tmprepo/preview-branch
 1   - delete local branch preview-branch
 1   - delete remote branch origin/preview-branch
-1   - close PR #304
 1
 1 Worktree requires confirmation:
 1   - CI status unknown
@@ -105,6 +101,16 @@ $ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main
 2 Preparing worktree (new branch 'dirty-branch')
 2 cannot remove dirty-branch: worktree has uncommitted changes
 ? 1
+
+$ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new dirty-force-branch --base main >/dev/null; cd ../dirty-force-branch; echo dirty >>README.md; printf "%s\n" "dirty-force-branch|306|OPEN|false|2000-01-30T00:00:00Z|https://example.com/pr/306" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt rm . -f'
+2 To ../remote.git
+2  * [new branch]      main -> main
+2 Preparing worktree (new branch 'dirty-force-branch')
+2 warning: forcing removal of dirty-force-branch: worktree has uncommitted changes
+1 Cleaning dirty-force-branch (branch dirty-force-branch)
+1   removed worktree /tmp/wt-transcripts/tmprepo/dirty-force-branch
+1   deleted local branch dirty-force-branch
+1 Removed dirty-force-branch; run `cd /tmp/wt-transcripts/tmprepo` to leave the deleted worktree
 
 $ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new alpha-branch --base main >/dev/null; cd ../alpha-branch; echo alpha >>README.md; git add README.md; git commit -m "alpha change" >/dev/null; git push -u origin alpha-branch >/dev/null; cd ../main; git merge alpha-branch >/dev/null; ../../bin/wt new beta-branch --base main >/dev/null; cd ../beta-branch; echo beta >>README.md; git add README.md; git commit -m "beta change" >/dev/null; git push -u origin beta-branch >/dev/null; cd ../main; git merge beta-branch >/dev/null; printf "%s\n" "alpha-branch|401|OPEN|false|2000-01-30T00:00:00Z|https://example.com/pr/401" "beta-branch|402|OPEN|false|2000-01-30T00:00:00Z|https://example.com/pr/402" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt rm alpha-branch beta-branch'
 2 To ../remote.git

@@ -49,7 +49,6 @@ $ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main
 1 To ../remote.git
 1  - [deleted]         gray-branch
 1   deleted remote branch origin/gray-branch
-1   closed PR #102
 1
 1 safe-branch (branch safe-branch)
 1 ----------------------------------------

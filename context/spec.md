@@ -190,10 +190,16 @@
   - With arguments, resolve each (in order) first as a worktree name under the project root, falling back to interpreting it as a path (absolute or relative). Paths must map to a known worktree directory (or something contained within it); ambiguous matches should produce an error. Duplicate identifiers should be ignored so each worktree is processed at most once per invocation.
 - Safety/classification logic mirrors `wt tidy`:
   - Inspect the target with the same heuristics (dirty, stash, shared branches, PR state, divergence, stale clocks, process usage, etc.) to determine whether it is safe, gray, or blocked.
-  - Blocked worktrees (including the default `main`/`master`, detached HEADs, dirty trees, stash entries, shared branches, or currently-active shells) must always refuse to run, even when forced.
   - Safe worktrees delete immediately; gray worktrees display the same mini status/prompt panel `wt tidy` uses.
-- Flags: only `--dry-run/-n` and `--force/-f`. Dry-run prints the planned actions for all requested targets (in order) and never mutates. Force skips the gray prompts (safe worktrees never prompt) but still refuses blocked targets.
-- Cleanup steps are identical to `wt tidy`: remove the worktree directory, delete the local branch, delete the remote branch if its tip still matches, close any open PRs referencing the branch, and run `git remote prune origin` if a remote ref was touched. `gh` remains a hard requirement.
+  - The default worktree (`main`/`master`) must always refuse to run, even when forced.
+- Flags: only `--dry-run/-n` and `--force/-f`.
+  - Dry-run prints the planned actions for all requested targets (in order) and never mutates.
+  - Force behavior:
+    - Skips gray prompts (equivalent to answering “yes”).
+    - Proceeds even when the target would otherwise be blocked (dirty trees, stash entries, shared branches, detached HEADs, git inspection errors, or “currently inside this worktree”), treating the block reasons as warnings.
+    - Best-effort cleanup: the primary goal is to remove the worktree directory. If follow-on cleanup (deleting local/remote branches, closing PRs, remote prune) fails after the directory is gone, the command must print warnings but still exit 0.
+    - If `git worktree remove --force` fails, `wt rm -f` may fall back to `rm -rf` of the target worktree directory, but only after validating that the target is a direct child of the discovered project root (with a `.wt/` directory) so it cannot delete arbitrary paths.
+- Cleanup steps are identical to `wt tidy`: remove the worktree directory, delete the local branch, delete the remote branch if its tip still matches, and run `git remote prune origin` if a remote ref was touched. `gh` remains a hard requirement.
 - When invoked from inside the worktree being deleted, `wt rm` must change directories back to the project root (or another surviving worktree, mirroring `wt tidy`) before removal. In multi-target runs, this relocation happens before deleting the first target that contains the current directory.
 - Document `wt rm` in the spec/README/DEVELOPING contexts alongside `wt tidy`, and cover the behavior with transcript tests (safe deletion, gray prompt, dry-run, blocked/forbidden cases, and forcing through gray).
 

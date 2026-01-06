@@ -1,0 +1,5 @@
+$ ./bin/wt --version
+1 wt version (devel)
+
+$ ./bin/wt version
+1 wt version (devel)

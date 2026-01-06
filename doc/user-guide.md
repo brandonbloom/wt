@@ -8,7 +8,11 @@ This guide describes how to install `wt`, prepare a repository for worktrees, an
    ```bash
    go install github.com/brandonbloom/wt/cmd/wt@latest
    ```
-2. Install the shell wrapper so subcommands can change your `cwd`:
+2. Confirm the installed version:
+   ```bash
+   wt version
+   ```
+3. Install the shell wrapper so subcommands can change your `cwd`:
    ```bash
    eval "$(wt activate)"
    ```

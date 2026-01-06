@@ -17,6 +17,9 @@ If you're not me, you probably don't want to use this.
 # Install or upgrade.
 go install github.com/brandonbloom/wt/cmd/wt@latest
 
+# Confirm the installed version.
+wt version
+
 # Install the shell wrapper (add to your shell rc).
 # This enables wt to automatically change directories.
 eval "$(wt activate)"

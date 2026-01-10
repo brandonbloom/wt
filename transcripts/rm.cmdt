@@ -4,19 +4,13 @@ $ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main
 2 Preparing worktree (new branch 'safe-branch')
 2 To ../remote.git
 2  * [new branch]      safe-branch -> safe-branch
-1
-1 safe-branch (branch safe-branch)
-1 ----------------------------------------
-1   PR:            none
-1   Divergence:    +1/-0 vs main
-1   Last activity: 2 days ago
-1   Dirty/Stash:   no / no
-1   Processes:     -
-1   Worktree:      /tmp/wt-transcripts/tmprepo/safe-branch
-1   Reasons:
-1     - CI status unknown
-1 Proceed with cleanup? [y/N/q]: 
-1 Skipped safe-branch: declined
+1 Cleaning safe-branch (branch safe-branch)
+1   removed worktree /tmp/wt-transcripts/tmprepo/safe-branch
+1   deleted local branch safe-branch
+1 To ../remote.git
+1  - [deleted]         safe-branch
+1   deleted remote branch origin/safe-branch
+1 Pruned remote origin
 
 $ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; cd main; git remote add origin ../remote.git; git push -u origin main >/dev/null; ../../bin/wt new pruned-branch --base main >/dev/null; cd ../pruned-branch; echo pruned >>README.md; git add README.md; git commit -m "pruned change" >/dev/null; git push -u origin pruned-branch >/dev/null; cd ../main; git --git-dir=../remote.git branch -D pruned-branch >/dev/null; printf "%s\n" "pruned-branch|311|OPEN|false|2000-01-30T00:00:00Z|https://example.com/pr/311" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-02-01T00:00:00Z ../../bin/wt rm -f pruned-branch'
 2 To ../remote.git
@@ -121,29 +115,16 @@ $ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main
 2 Preparing worktree (new branch 'beta-branch')
 2 To ../remote.git
 2  * [new branch]      beta-branch -> beta-branch
-1
-1 alpha-branch (branch alpha-branch)
-1 ----------------------------------------
-1   PR:            none
-1   Divergence:    +1/-0 vs main
-1   Last activity: 2 days ago
-1   Dirty/Stash:   no / no
-1   Processes:     -
-1   Worktree:      /tmp/wt-transcripts/tmprepo/alpha-branch
-1   Reasons:
-1     - CI status unknown
-1 Proceed with cleanup? [y/N/q]: 
-1 Skipped alpha-branch: declined
-1
-1 beta-branch (branch beta-branch)
-1 ----------------------------------------
-1   PR:            none
-1   Divergence:    +2/-0 vs main
-1   Last activity: 2 days ago
-1   Dirty/Stash:   no / no
-1   Processes:     -
-1   Worktree:      /tmp/wt-transcripts/tmprepo/beta-branch
-1   Reasons:
-1     - CI status unknown
-1 Proceed with cleanup? [y/N/q]: 
-1 Skipped beta-branch: declined
+1 Cleaning alpha-branch (branch alpha-branch)
+1   removed worktree /tmp/wt-transcripts/tmprepo/alpha-branch
+1   deleted local branch alpha-branch
+1 To ../remote.git
+1  - [deleted]         alpha-branch
+1   deleted remote branch origin/alpha-branch
+1 Cleaning beta-branch (branch beta-branch)
+1   removed worktree /tmp/wt-transcripts/tmprepo/beta-branch
+1   deleted local branch beta-branch
+1 To ../remote.git
+1  - [deleted]         beta-branch
+1   deleted remote branch origin/beta-branch
+1 Pruned remote origin

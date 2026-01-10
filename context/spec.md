@@ -82,7 +82,7 @@
   - CLI failures (missing `gh`, auth issues, rate limits) never abort `wt status`; instead, rows show `CI? gh error` (dim) and downstream commands treat the worktree as gray/unknown.
 - Timestamp derived as: newest file mtime when the worktree is dirty or has staged changes; otherwise use the HEAD commit timestamp. Display the timestamp as a friendly relative string (e.g., `3s ago`, `2 min ago`, `yesterday 2pm`, `4 days ago`) instead of raw ISO text.
   - If the branch has an associated GitHub pull request, display its status.
-- Pull request summaries follow the same rules as `wt tidy`: only show badges when the worktree has local changes or commits that are not yet on the default branch. Worktrees without an associated PR display `No PR`, while branches with closed/merged PRs and new commits show `PR #123 merged; unpublished commits` (or an equivalent state string).
+- Pull request summaries follow the same rules as `wt tidy`: only show badges when the worktree has local changes or commits that are not yet on the default branch. When PRs are considered “expected” for the repo, worktrees without an associated PR display `No PR`, while branches with closed/merged PRs and new commits show `PR #123 merged; unpublished commits` (or an equivalent state string).
 - When run inside a specific worktree, highlight that worktree with additional detail while still summarizing the others.
 - Display a per-worktree summary of processes owned by the current user whose working directories (after resolving symlinks) live anywhere within that worktree. Format entries as `command (pid)` separated by commas, include at least three entries when available, and append `+ N more` when truncating to fit within roughly 80 columns. On macOS and Linux this data must be gathered via platform APIs (`/proc` on Linux, `sysctl`/`proc_pidpath` on macOS). Unsupported platforms may omit the column entirely, but supported platforms must fail the command if process discovery fails outright.
 - Output should respect the “silence is golden” philosophy where possible (e.g., avoid gratuitous chatter when nothing noteworthy changed).
@@ -103,7 +103,7 @@
 | PR   | `PR loading...`                      | Awaiting PR lookup                                            | Used while PR metadata fetch is outstanding.                                                               |
 | PR   | `PR #42 open`                        | Single open PR attached                                       | Render draft/open/merged/closed states inline (`PR #42 draft`, `PR #42 merged`, etc.).                     |
 | PR   | `PR #99 merged; unpublished commits` | Previously merged PR but new commits exist on worktree        | Signals that the worktree diverged again after the PR closed/merged.                                       |
-| PR   | `No PR`                              | No pull request associated                                    | Displayed for both clean branches and worktrees with unique commits but no PR; tidy still lists reasons.   |
+| PR   | `No PR`                              | No pull request associated                                    | Displayed only when PRs are considered “expected” for the repo (remote-first default-branch comparisons). Local-first repos elide this label to avoid noise; tidy may still list other gray reasons. |
 | PR   | `PR multiple (#10, #11, …)`          | Multiple PRs reference the branch                             | Include up to three PR numbers, then `…` to show ambiguity.                                                |
 | PR   | `PR unavailable (gh auth error)`     | PR data fetch failed                                          | Prefix `PR unavailable` with the underlying error cause (auth, network, etc.).                             |
 
@@ -111,19 +111,19 @@
 
 - Purpose: prune finished or abandoned worktrees/branches so the project root stays manageable without losing work.
 - Safety classification:
-- **Safe** candidates satisfy the “nothing of value will be lost” rule: the worktree has no staged/unstaged changes, no stash entries, its HEAD (and therefore every unique commit) is already reachable from the configured default branch, `git status` is clean, and at most one GitHub pull request targets the branch. If an open PR exists but the commits already landed on the default branch, `wt tidy` treats it as safe and closes the PR as part of cleanup.
+- **Safe** candidates satisfy the “nothing of value will be lost” rule: the worktree has no staged/unstaged changes, no stash entries, its HEAD (and therefore every unique commit) is already reachable from the configured default branch, `git status` is clean, and at most one GitHub pull request targets the branch.
   - Default branch comparisons are “workflow aware”: when `refs/remotes/origin/<default_branch>` exists and the local default branch is **not** ahead of it, treat `origin/<default_branch>` as the source of truth for “already merged / unique commits” checks (remote-first). If the local default branch is ahead of `origin/<default_branch>` (or the remote-tracking ref is missing), treat the local default branch as the source of truth (local-first).
   - Feature branches that were merged via squash/rebase (so their commits are no longer ancestors of the default branch) still qualify as safe when their tree matches the default branch—`wt tidy` must detect this and avoid flagging “commits not merged” for these fully synchronized branches.
   - Branches that lag behind the default branch but whose ahead commits are patch-identical to commits already present on the default branch (i.e., `git cherry` reports no unique commits) must also be treated as safe, since deleting them does not lose any effective change.
   - Branches with new commits but only merged/closed PRs must hide the stale PR badge and include a gray reason like “PR #123 merged; unpublished commits” so operators know to open a new PR (or discard the work) before tidying.
   - **Gray** candidates carry some ambiguity (e.g., commits not merged yet, a lone PR that has stalled, last activity older than the stale threshold, or divergence beyond the configured limit) but still have a clean worktree/stash so the user can explicitly discard them.
   - **Blocked** candidates have local state that would definitely cause data loss (untracked/staged changes, stash entries, other worktrees pointing at the same branch, or multiple PRs for the same head); `wt tidy` refuses to touch them and prints guidance to resolve the blockers manually.
+  - CI lookups must not block cleanup by themselves: when a worktree has no pending work (clean tree, no stash, no unique commits), missing/unknown CI is informational only and must not force a gray prompt.
 - Cleanup actions for safe or approved gray candidates happen in one transaction per worktree:
   - Emit a short recap of the branch/worktree slated for deletion.
   - Delete the worktree directory.
   - Delete the corresponding local branch (after confirming no other worktree references it).
   - Delete the remote branch (default `origin`) once HEAD parity is confirmed to avoid nuking rewritten history.
-  - Close the associated PR via `gh pr close --comment "...tidy..."`. This runs even for open PRs whose commits already landed in the default branch so dangling references disappear.
   - Prune the remote (`git remote prune origin`) once at the end of the command to remove stale refs.
 - CLI ergonomics:
   - `wt tidy` defaults to scanning every non-default worktree. Flags include:
@@ -144,8 +144,8 @@
   - A branch whose last activity is older than 14 days (default) is considered stale. The counter uses the same timestamp as the prompt panel.
   - More than 20 commits of divergence (ahead or behind) relative to the default branch marks the branch as gray even if it is otherwise clean, since the drift suggests abandonment.
   - Any open PR whose commits have not yet merged into the default branch is gray; `wt tidy` highlights the PR URL/status so the user can make the call.
-  - Any branch with multiple PRs (reopened or duplicate heads) is gray because we cannot automatically determine which to close.
-  - Worktrees whose latest CI run failed, or whose CI status is unknown because GitHub data could not be fetched, must be classified as gray so problems are impossible to miss.
+  - Any branch with multiple PRs (reopened or duplicate heads) is gray because we cannot automatically determine which PR is the relevant one.
+  - When a worktree has pending work (e.g., unique commits not yet merged), failed CI or unknown CI due to GitHub data fetch failures must be classified as gray so problems are impossible to miss.
 - Worktrees that have active processes in their directory tree must be classified as gray even if they would otherwise be safe; the prompt should reuse the same per-worktree process summary rendered by `wt status`.
 - When `wt tidy` is invoked from inside a worktree that ultimately gets deleted, the command must automatically change directories back to the project root (or another surviving worktree) before removal so the user never loses their active shell.
 - Configuration:
@@ -155,7 +155,7 @@
     - `divergence_commits = 20` controls how many commits of ahead/behind drift marks a branch as gray.
   - Future knobs (e.g., remote name) should also live under `[tidy]`.
 - Error handling & UX:
-  - Refuse to run if `gh` is unavailable, since PR inspection/closure is mandatory for the feature.
+  - Treat GitHub data (PR/CI) as best-effort: missing/unavailable `gh` must not prevent safe cleanup when no pending work would be lost.
   - When skipping a worktree (blocked or rejected prompt), explain why so the user can fix or rerun.
   - The README “Everyday Usage” section should mention `wt tidy` with only the high-traffic flags (`--dry-run`, `--safe`, `--all`), while the detailed config and prompt behaviors belong in `DEVELOPING.md` or a dedicated docs section.
 - Cover the new command with transcript fixtures that demonstrate safe cleanup, gray prompting, dry-run output, and blocked cases.
@@ -199,7 +199,7 @@
     - Proceeds even when the target would otherwise be blocked (dirty trees, stash entries, shared branches, detached HEADs, git inspection errors, or “currently inside this worktree”), treating the block reasons as warnings.
     - Best-effort cleanup: the primary goal is to remove the worktree directory. If follow-on cleanup (deleting local/remote branches, closing PRs, remote prune) fails after the directory is gone, the command must print warnings but still exit 0.
     - If `git worktree remove --force` fails, `wt rm -f` may fall back to `rm -rf` of the target worktree directory, but only after validating that the target is a direct child of the discovered project root (with a `.wt/` directory) so it cannot delete arbitrary paths.
-- Cleanup steps are identical to `wt tidy`: remove the worktree directory, delete the local branch, delete the remote branch if its tip still matches, and run `git remote prune origin` if a remote ref was touched. `gh` remains a hard requirement.
+- Cleanup steps are identical to `wt tidy`: remove the worktree directory, delete the local branch, delete the remote branch if its tip still matches, and run `git remote prune origin` if a remote ref was touched.
 - When invoked from inside the worktree being deleted, `wt rm` must change directories back to the project root (or another surviving worktree, mirroring `wt tidy`) before removal. In multi-target runs, this relocation happens before deleting the first target that contains the current directory.
 - Document `wt rm` in the spec/README/DEVELOPING contexts alongside `wt tidy`, and cover the behavior with transcript tests (safe deletion, gray prompt, dry-run, blocked/forbidden cases, and forcing through gray).
 

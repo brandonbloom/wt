@@ -7,18 +7,34 @@ import (
 	"github.com/brandonbloom/wt/internal/project"
 )
 
-func defaultBranchComparisonRef(proj *project.Project) string {
+type defaultBranchCompareContext struct {
+	CompareRef   string
+	PRsExpected  bool
+	SyncMode     gitutil.DefaultBranchSyncMode
+	DefaultBranch string
+}
+
+func defaultBranchComparisonContext(proj *project.Project) defaultBranchCompareContext {
 	if proj == nil {
-		return ""
+		return defaultBranchCompareContext{}
 	}
 	workdir := proj.DefaultWorktreePath
 	if workdir == "" && proj.Root != "" && proj.DefaultWorktree != "" {
 		workdir = filepath.Join(proj.Root, proj.DefaultWorktree)
 	}
-	ref, _, err := gitutil.DefaultBranchComparisonRef(workdir, "origin", proj.Config.DefaultBranch)
+	ref, mode, err := gitutil.DefaultBranchComparisonRef(workdir, "origin", proj.Config.DefaultBranch)
 	if err != nil {
-		return proj.Config.DefaultBranch
+		return defaultBranchCompareContext{
+			CompareRef:    proj.Config.DefaultBranch,
+			PRsExpected:   false,
+			SyncMode:      gitutil.DefaultBranchLocalFirst,
+			DefaultBranch: proj.Config.DefaultBranch,
+		}
 	}
-	return ref
+	return defaultBranchCompareContext{
+		CompareRef:    ref,
+		PRsExpected:   mode == gitutil.DefaultBranchRemoteFirst,
+		SyncMode:      mode,
+		DefaultBranch: proj.Config.DefaultBranch,
+	}
 }
-

@@ -58,6 +58,9 @@ func TestCombineStatusDetailOmitsCINoiseForNoPR(t *testing.T) {
 	if got := combineStatusDetail("No PR", ciMissingCommitLabel); got != "No PR" {
 		t.Fatalf("combineStatusDetail = %q, want %q", got, "No PR")
 	}
+	if got := combineStatusDetail("", ciMissingCommitLabel); got != "" {
+		t.Fatalf("combineStatusDetail = %q, want %q", got, "")
+	}
 	want := "No PR · CI✓"
 	if got := combineStatusDetail("No PR", "CI✓"); got != want {
 		t.Fatalf("combineStatusDetail = %q, want %q", got, want)

@@ -78,8 +78,10 @@ Use this when dependencies drift or you need to reapply setup steps after `wt ne
 - **Blocked** – Local changes, stash entries, multiple worktrees per branch, or other situations that guarantee data loss. These are never touched; `wt tidy` prints guidance instead.
 
 Default branch comparisons are workflow-aware: if `origin/<default_branch>` exists locally and your local default branch is not ahead of it, wt treats `origin/<default_branch>` as the source of truth for “merged / unique commits” checks. If your local default branch is ahead of `origin/<default_branch>` (or the remote-tracking ref is missing), wt treats the local default branch as the source of truth.
+When the repo is treated as local-first, the dashboard omits the literal `No PR` label (PRs aren’t an expected workflow step), but still shows PR metadata when PRs exist.
+Missing/unknown CI does not block deleting safe worktrees; it only becomes a “gray reason” when there is pending work to potentially lose.
 
-Cleanup (for safe items or approved gray ones) removes the worktree directory, deletes the local and remote branches, closes the associated PR via `gh pr close --comment '...tidy...'`, and finally runs `git remote prune origin` once to drop stale refs.
+Cleanup (for safe items or approved gray ones) removes the worktree directory, deletes the local and remote branches, and finally runs `git remote prune origin` once to drop stale refs.
 
 ### Flags & Policies
 
@@ -89,7 +91,7 @@ Cleanup (for safe items or approved gray ones) removes the worktree directory, d
 
 When prompting for gray candidates, `wt tidy` renders a mini status panel showing PR state, ahead/behind counts, divergence badge vs the default branch, last-activity timestamp (max of HEAD, PR updates, or worktree mtime), dirty indicators, stash presence, and any running processes that have their `cwd` inside the worktree. Answer `y` to proceed, `n` to skip, or Ctrl+C to cancel the whole command.
 
-`wt tidy` requires the GitHub CLI because closing PRs and inspecting their state is mandatory for cleanup.
+`wt tidy` uses the GitHub CLI for PR/CI metadata when available, but can still clean up safe worktrees without it.
 
 ### Targeted Removal (`wt rm`)
 
@@ -115,7 +117,7 @@ Key behaviors:
   - `-f, --force` – Skip prompts for gray worktrees. Blocked targets still refuse to run.
 - When you run `wt rm` from inside a worktree that gets deleted, the command instructs the wrapper to `cd` back to the project root first. If the wrapper isn’t active you’ll see a message reminding you to change directories manually.
 
-Cleanup steps mirror `wt tidy`: remove the worktree directory, delete the local branch, delete the remote branch if its tip still matches, close any open PRs through `gh`, and run `git remote prune origin` once if at least one remote ref was removed.
+Cleanup steps mirror `wt tidy`: remove the worktree directory, delete the local branch, delete the remote branch if its tip still matches, and run `git remote prune origin` once if at least one remote ref was removed.
 
 ## Process Cleanup (`wt kill`, `wt tidy --kill`)
 

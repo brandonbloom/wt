@@ -9,16 +9,18 @@ $ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main
 2  * [new branch]      gray-branch -> gray-branch
 2 Preparing worktree (new branch 'dirty-branch')
 2 warning: unsupported remote URL: ../remote.git
+1 Will clean up:
+1 - safe-branch (branch safe-branch)
+1     remove worktree /tmp/wt-transcripts/tmprepo/safe-branch
+1     delete local branch safe-branch
+1     delete remote branch origin/safe-branch
+1
 1 Will prompt for:
 1 - gray-branch (branch gray-branch)
 1     reasons:
-1       * CI status unknown
 1       * commits not merged into main
 1       * PR #102 open
 1       * stale for 17 days
-1 - safe-branch (branch safe-branch)
-1     reasons:
-1       * CI status unknown
 1
 1 Will skip:
 1 - dirty-branch (worktree has uncommitted changes)
@@ -39,14 +41,11 @@ $ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main
 1 Will prompt for:
 1 - gray-branch (branch gray-branch)
 1     reasons:
-1       * CI status unknown
 1       * commits not merged into main
-1       * No PR
 1       * stale for 31 days
 1 - safe-branch (branch safe-branch)
 1     reasons:
 1       * processes running: server (1234)
-1       * CI status unknown
 1
 1
 1 Remote maintenance:

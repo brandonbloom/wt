@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"os/exec"
 	"sort"
 	"strings"
@@ -80,6 +81,39 @@ type ciFetchResult struct {
 func fetchCIStatuses(ctx context.Context, opts ciFetchOptions, statuses []*worktreeStatus, now time.Time, onUpdate func(*worktreeStatus)) error {
 	if len(statuses) == 0 {
 		return nil
+	}
+
+	if strings.TrimSpace(os.Getenv("WT_TEST_SERIAL_FETCH")) != "" {
+		var combined error
+		for _, status := range statuses {
+			target, err := determineCITarget(status)
+			if err != nil {
+				setCIError(status, fmt.Sprintf("CI: ? %s", err.Error()), ciStateError)
+				if onUpdate != nil {
+					onUpdate(status)
+				}
+				continue
+			}
+			res, err := fetchCITarget(ctx, opts, target)
+			if errors.Is(err, context.Canceled) {
+				markCIInterrupted(statuses, onUpdate)
+				return err
+			}
+			if err != nil {
+				combined = errors.Join(combined, err)
+				msg := formatCIErrorLabel(err)
+				setCIError(status, msg, ciStateError)
+				if onUpdate != nil {
+					onUpdate(status)
+				}
+				continue
+			}
+			applyCIResult(status, res, now)
+			if onUpdate != nil {
+				onUpdate(status)
+			}
+		}
+		return combined
 	}
 
 	if opts.Repo == nil {

@@ -84,9 +84,12 @@ type prContext struct {
 	HasUniqueCommits bool
 }
 
-func summarizePullRequestState(ctx prContext, prs []pullRequestInfo) prSummary {
+func summarizePullRequestState(ctx prContext, prs []pullRequestInfo, workflow workflowExpectations) prSummary {
 	if !ctx.HasPendingWork {
-		return prSummary{Column: "No PR"}
+		if workflow.PRsExpected {
+			return prSummary{Column: "No PR"}
+		}
+		return prSummary{Column: ""}
 	}
 	active := openPullRequests(prs)
 	if len(active) > 0 {
@@ -102,6 +105,9 @@ func summarizePullRequestState(ctx prContext, prs []pullRequestInfo) prSummary {
 		return prSummary{Column: ""}
 	}
 	if len(prs) == 0 {
+		if !workflow.PRsExpected {
+			return prSummary{Column: "", Reason: ""}
+		}
 		return prSummary{
 			Column: "No PR",
 			Reason: "No PR",

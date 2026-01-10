@@ -5,10 +5,11 @@ $ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main
 2 To ../remote.git
 2  * [new branch]      squash-branch -> squash-branch
 2 warning: unsupported remote URL: ../remote.git
-1 Will prompt for:
+1 Will clean up:
 1 - squash-branch (branch squash-branch)
-1     reasons:
-1       * CI status unknown
+1     remove worktree /tmp/wt-transcripts/tmprepo/squash-branch
+1     delete local branch squash-branch
+1     delete remote branch origin/squash-branch
 1
 1
 1 Remote maintenance:

@@ -29,7 +29,8 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	defaultCompareRef := defaultBranchComparisonRef(proj)
+	compareCtx := defaultBranchComparisonContext(proj)
+	workflow := workflowExpectationsForProject(compareCtx)
 	ciRepo, ciRepoErr := resolveGitHubRepo(proj)
 
 	worktrees, err := project.ListWorktrees(proj.Root)
@@ -53,7 +54,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	now := currentTimeOverride()
 	statuses := make([]*worktreeStatus, 0, len(worktrees))
 	for _, wt := range worktrees {
-		status, err := collectWorktreeStatus(proj, wt, defaultCompareRef)
+		status, err := collectWorktreeStatus(proj, wt, compareCtx.CompareRef)
 		if err != nil {
 			msg := singleLineError(err)
 			if friendly, ok := friendlyWorktreeGitError(wt.Name, err); ok {
@@ -110,9 +111,17 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	err = fetchPullRequestStatuses(ctx, statuses, proj.DefaultWorktree, rerender)
+	err = fetchPullRequestStatuses(ctx, statuses, workflow, rerender)
 	if err != nil && errors.Is(err, context.Canceled) {
 		fmt.Fprintln(cmd.ErrOrStderr(), "warning: cancelled GitHub fetch")
+	}
+
+	if renderer != nil {
+		if pause := strings.TrimSpace(os.Getenv("WT_TEST_STATUS_PAUSE_AFTER_PR")); pause != "" {
+			if d, perr := time.ParseDuration(pause); perr == nil && d > 0 {
+				time.Sleep(d)
+			}
+		}
 	}
 
 	ciOpts := ciFetchOptions{
@@ -666,34 +675,48 @@ func formatStatusLines(statuses []*worktreeStatus, now time.Time, layout columnL
 	return lines
 }
 
-func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus, defaultWorktree string, onUpdate func(*worktreeStatus)) error {
+func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus, workflow workflowExpectations, onUpdate func(*worktreeStatus)) error {
 	if len(statuses) == 0 {
 		return nil
+	}
+
+	if strings.TrimSpace(os.Getenv("WT_TEST_SERIAL_FETCH")) != "" {
+		var combined error
+		for _, status := range statuses {
+			prs, err := queryPullRequests(ctx, status.Path, status.Branch)
+			if errors.Is(err, context.Canceled) {
+				markPRInterrupted(statuses, onUpdate)
+				return err
+			}
+			if err != nil {
+				msg := singleLineError(err)
+				if msg == "" {
+					msg = "error"
+				}
+				status.PRStatus = fmt.Sprintf("PR: unavailable (%s)", msg)
+				combined = errors.Join(combined, fmt.Errorf("%s: %w", status.Name, err))
+				if onUpdate != nil {
+					onUpdate(status)
+				}
+				continue
+			}
+			status.PullRequests = append([]pullRequestInfo(nil), prs...)
+			summary := summarizePullRequestState(prContext{
+				HasPendingWork:   status.HasPendingWork,
+				HasUniqueCommits: status.UniqueAhead > 0,
+			}, prs, workflow)
+			status.PRStatus = summary.Column
+			if onUpdate != nil {
+				onUpdate(status)
+			}
+		}
+		return combined
 	}
 
 	type prResult struct {
 		status *worktreeStatus
 		prs    []pullRequestInfo
 		err    error
-	}
-
-	ordered := make([]*worktreeStatus, 0, len(statuses))
-	if defaultWorktree != "" {
-		for _, status := range statuses {
-			if status != nil && status.Name == defaultWorktree {
-				ordered = append(ordered, status)
-				break
-			}
-		}
-	}
-	for _, status := range statuses {
-		if status == nil {
-			continue
-		}
-		if defaultWorktree != "" && status.Name == defaultWorktree {
-			continue
-		}
-		ordered = append(ordered, status)
 	}
 
 	results := make(chan prResult, len(statuses))
@@ -716,8 +739,6 @@ func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus, d
 	}()
 
 	var combined error
-	pending := make(map[*worktreeStatus]prResult, len(statuses))
-	next := 0
 	for {
 		select {
 		case <-ctx.Done():
@@ -730,39 +751,26 @@ func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus, d
 			if !ok {
 				return combined
 			}
-			if res.status != nil {
-				pending[res.status] = res
-			}
-			for next < len(ordered) {
-				status := ordered[next]
-				prRes, ready := pending[status]
-				if !ready {
-					break
+			if res.err != nil {
+				msg := singleLineError(res.err)
+				if msg == "" {
+					msg = "error"
 				}
-				delete(pending, status)
-				next++
-
-				if prRes.err != nil {
-					msg := singleLineError(prRes.err)
-					if msg == "" {
-						msg = "error"
-					}
-					status.PRStatus = fmt.Sprintf("PR: unavailable (%s)", msg)
-					combined = errors.Join(combined, fmt.Errorf("%s: %w", status.Name, prRes.err))
-					if onUpdate != nil {
-						onUpdate(status)
-					}
-					continue
-				}
-				status.PullRequests = append([]pullRequestInfo(nil), prRes.prs...)
-				summary := summarizePullRequestState(prContext{
-					HasPendingWork:   status.HasPendingWork,
-					HasUniqueCommits: status.UniqueAhead > 0,
-				}, prRes.prs)
-				status.PRStatus = summary.Column
+				res.status.PRStatus = fmt.Sprintf("PR: unavailable (%s)", msg)
+				combined = errors.Join(combined, fmt.Errorf("%s: %w", res.status.Name, res.err))
 				if onUpdate != nil {
-					onUpdate(status)
+					onUpdate(res.status)
 				}
+				continue
+			}
+			res.status.PullRequests = append([]pullRequestInfo(nil), res.prs...)
+			summary := summarizePullRequestState(prContext{
+				HasPendingWork:   res.status.HasPendingWork,
+				HasUniqueCommits: res.status.UniqueAhead > 0,
+			}, res.prs, workflow)
+			res.status.PRStatus = summary.Column
+			if onUpdate != nil {
+				onUpdate(res.status)
 			}
 		}
 	}
@@ -815,7 +823,7 @@ func isDetachedHeadError(err error) bool {
 func combineStatusDetail(prStatus, ciStatus string) string {
 	pr := strings.TrimSpace(prStatus)
 	ci := strings.TrimSpace(ciStatus)
-	if isNoPRStatus(pr) && isCIMissingCommit(ci) {
+	if (isNoPRStatus(pr) || pr == "") && isCIMissingCommit(ci) {
 		ci = ""
 	}
 	switch {

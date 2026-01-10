@@ -14,7 +14,6 @@ $ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main
 1 - safe-branch (branch safe-branch)
 1     reasons:
 1       * processes running: server (4444)
-1       * CI status unknown
 1
 1
 1 Remote maintenance:
@@ -30,13 +29,20 @@ $ WT_SKIP_DEFAULT_ORIGIN=1 ./transcripts/entrypoint.sh bash -lc 'set -e; cd main
 1 Killing processes in safe-branch (signal SIGTERM (15))
 1   cleared
 1 Plan:
-1 Will prompt for:
+1 Will clean up:
 1 - safe-branch (branch safe-branch)
-1     reasons:
-1       * CI status unknown
+1     remove worktree /tmp/wt-transcripts/tmprepo/safe-branch
+1     delete local branch safe-branch
+1     delete remote branch origin/safe-branch
 1
 1
 1 Remote maintenance:
 1 - git remote prune origin
 1
-1 Skipped safe-branch: --policy=safe
+1 Cleaning safe-branch (branch safe-branch)
+1   removed worktree /tmp/wt-transcripts/tmprepo/safe-branch
+1   deleted local branch safe-branch
+1 To ../remote.git
+1  - [deleted]         safe-branch
+1   deleted remote branch origin/safe-branch
+1 Pruned remote origin

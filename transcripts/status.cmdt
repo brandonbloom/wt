@@ -8,7 +8,7 @@ $ ./transcripts/entrypoint.sh bash -lc 'cd main && export PATH="$(pwd)/../bin:$P
 
 $ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new demo-branch --base main >/dev/null 2>&1 && cd ../demo-branch && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && printf '"'"'[{"pid":9101,"command":"server","cwd":"%s"},{"pid":9202,"command":"editor","cwd":"%s"}]\n'"'"' "$(pwd)" "$(pwd)/../main" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && ../../bin/wt'
 1 * demo-branch  dirty       just now           PR #42 open · CI✗ Pull Request Checks (1s ago) · server (9101)                  
-1   main                     2 days ago         No PR · CI✓ · editor (9202)                                                     
+1   main                     2 days ago         CI✓ · editor (9202)                                                             
 1
 1 CI details (demo-branch):
 1 - Pull Request Checks — failure
@@ -17,9 +17,9 @@ $ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PAT
 
 $ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new merged-branch --base main >/dev/null 2>&1 && cd ../merged-branch && echo merged >>README.md && git add README.md && git commit -m "merged work" >/dev/null && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && printf '"'"'[{"pid":9303,"command":"deploy","cwd":"%s"}]\n'"'"' "$(pwd)" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && ../../bin/wt'
 1 * merged-branch  dirty     just now           PR #99 merged; unpublished commits · CI✓ · deploy (9303)                        
-1   main                     2 days ago         No PR · CI✓                                                                     
+1   main                     2 days ago         CI✓                                                                             
 
-$ ./transcripts/entrypoint.sh bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && printf '"'"'[{"pid":9141,"ppid":8000,"command":"hexdump","cwd":"%s"},{"pid":9142,"ppid":9141,"command":"script","cwd":"%s"},{"pid":9143,"ppid":9000,"command":"zsh","cwd":"%s"},{"pid":9144,"ppid":9143,"command":"zsh","cwd":"%s"}]\n'"'"' "$(pwd)" "$(pwd)" "$(pwd)" "$(pwd)" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && script -q /dev/null ../../bin/wt | hexdump -C'
+$ ./transcripts/entrypoint.sh bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && export WT_TEST_SERIAL_FETCH="1" && export WT_TEST_STATUS_PAUSE_AFTER_PR="50ms" && printf '"'"'[{"pid":9141,"ppid":8000,"command":"hexdump","cwd":"%s"},{"pid":9142,"ppid":9141,"command":"script","cwd":"%s"},{"pid":9143,"ppid":9000,"command":"zsh","cwd":"%s"},{"pid":9144,"ppid":9143,"command":"zsh","cwd":"%s"}]\n'"'"' "$(pwd)" "$(pwd)" "$(pwd)" "$(pwd)" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && script -q /dev/null ../../bin/wt | hexdump -C'
 1 00000000  5e 44 08 08 77 61 72 6e  69 6e 67 3a 20 73 68 65  |^D..warning: she|
 1 00000010  6c 6c 20 77 72 61 70 70  65 72 20 6d 69 73 73 69  |ll wrapper missi|
 1 00000020  6e 67 3b 20 61 64 64 20  60 65 76 61 6c 20 22 24  |ng; add `eval "$|
@@ -44,7 +44,7 @@ $ ./transcripts/entrypoint.sh bash -lc 'cd main && export PATH="$(pwd)/../bin:$P
 1 00000150  2c 20 73 63 72 69 70 74  20 28 39 31 34 e2 80 a6  |, script (914...|
 1 00000160  0d 0a                                             |..|
 1 00000162
-$ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new demo-branch --base main >/dev/null 2>&1 && cd ../demo-branch && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && printf '"'"'[{"pid":9151,"ppid":8300,"command":"demo","cwd":"%s"},{"pid":9152,"ppid":9151,"command":"hexdump","cwd":"%s"},{"pid":9153,"ppid":9151,"command":"script","cwd":"%s"},{"pid":9154,"ppid":8400,"command":"zsh","cwd":"%s"},{"pid":9155,"ppid":8500,"command":"main-wt","cwd":"%s"}]\n'"'"' "$(pwd)" "$(pwd)" "$(pwd)" "$(pwd)" "$(pwd)/../main" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && script -q /dev/null ../../bin/wt | hexdump -C'
+$ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new demo-branch --base main >/dev/null 2>&1 && cd ../demo-branch && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && export WT_TEST_SERIAL_FETCH="1" && export WT_TEST_STATUS_PAUSE_AFTER_PR="50ms" && printf '"'"'[{"pid":9151,"ppid":8300,"command":"demo","cwd":"%s"},{"pid":9152,"ppid":9151,"command":"hexdump","cwd":"%s"},{"pid":9153,"ppid":9151,"command":"script","cwd":"%s"},{"pid":9154,"ppid":8400,"command":"zsh","cwd":"%s"},{"pid":9155,"ppid":8500,"command":"main-wt","cwd":"%s"}]\n'"'"' "$(pwd)" "$(pwd)" "$(pwd)" "$(pwd)" "$(pwd)/../main" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && script -q /dev/null ../../bin/wt | hexdump -C'
 1 00000000  5e 44 08 08 2a 20 64 65  6d 6f 2d 62 72 61 6e 63  |^D..* demo-branc|
 1 00000010  68 20 20 64 69 72 74 79  20 20 20 20 20 20 20 6a  |h  dirty       j|
 1 00000020  75 73 74 20 6e 6f 77 20  20 20 20 20 20 20 20 20  |ust now         |
@@ -59,14 +59,14 @@ $ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PAT
 1 000000b0  0d 1b 5b 4a 2a 20 64 65  6d 6f 2d 62 72 61 6e 63  |..[J* demo-branc|
 1 000000c0  68 20 20 64 69 72 74 79  20 20 20 20 20 20 20 6a  |h  dirty       j|
 1 000000d0  75 73 74 20 6e 6f 77 20  20 20 20 20 20 20 20 20  |ust now         |
-1 000000e0  20 20 50 52 3a 20 6c 6f  61 64 69 6e 67 2e 2e 2e  |  PR: loading...|
-1 000000f0  20 c2 b7 20 64 65 6d 6f  20 28 39 31 35 31 29 2c  | .. demo (9151),|
-1 00000100  20 68 65 78 e2 80 a6 0d  0a 20 20 6d 61 69 6e 20  | hex.....  main |
+1 000000e0  20 20 50 52 20 23 34 32  20 6f 70 65 6e 20 c2 b7  |  PR #42 open ..|
+1 000000f0  20 64 65 6d 6f 20 28 39  31 35 31 29 2c 20 68 65  | demo (9151), he|
+1 00000100  78 64 75 6d e2 80 a6 0d  0a 20 20 6d 61 69 6e 20  |xdum.....  main |
 1 00000110  20 20 20 20 20 20 20 20  20 20 20 20 20 20 20 20  |                |
 1 00000120  20 20 20 20 32 20 64 61  79 73 20 61 67 6f 20 20  |    2 days ago  |
-1 00000130  20 20 20 20 20 20 20 4e  6f 20 50 52 20 c2 b7 20  |       No PR .. |
-1 00000140  6d 61 69 6e 2d 77 74 20  28 39 31 35 35 29 20 20  |main-wt (9155)  |
-1 00000150  20 20 20 20 20 20 20 20  20 20 0d 0a 1b 5b 32 41  |          ...[2A|
+1 00000130  20 20 20 20 20 20 20 50  52 3a 20 6c 6f 61 64 69  |       PR: loadi|
+1 00000140  6e 67 2e 2e 2e 20 c2 b7  20 6d 61 69 6e 2d 77 74  |ng... .. main-wt|
+1 00000150  20 28 39 31 35 35 29 20  20 20 0d 0a 1b 5b 32 41  | (9155)   ...[2A|
 1 00000160  0d 1b 5b 4a 2a 20 64 65  6d 6f 2d 62 72 61 6e 63  |..[J* demo-branc|
 1 00000170  68 20 20 64 69 72 74 79  20 20 20 20 20 20 20 6a  |h  dirty       j|
 1 00000180  75 73 74 20 6e 6f 77 20  20 20 20 20 20 20 20 20  |ust now         |
@@ -75,42 +75,42 @@ $ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PAT
 1 000001b0  78 64 75 6d e2 80 a6 0d  0a 20 20 6d 61 69 6e 20  |xdum.....  main |
 1 000001c0  20 20 20 20 20 20 20 20  20 20 20 20 20 20 20 20  |                |
 1 000001d0  20 20 20 20 32 20 64 61  79 73 20 61 67 6f 20 20  |    2 days ago  |
-1 000001e0  20 20 20 20 20 20 20 4e  6f 20 50 52 20 c2 b7 20  |       No PR .. |
-1 000001f0  6d 61 69 6e 2d 77 74 20  28 39 31 35 35 29 20 20  |main-wt (9155)  |
-1 00000200  20 20 20 20 20 20 20 20  20 20 0d 0a 1b 5b 32 41  |          ...[2A|
-1 00000210  0d 1b 5b 4a 2a 20 64 65  6d 6f 2d 62 72 61 6e 63  |..[J* demo-branc|
-1 00000220  68 20 20 64 69 72 74 79  20 20 20 20 20 20 20 6a  |h  dirty       j|
-1 00000230  75 73 74 20 6e 6f 77 20  20 20 20 20 20 20 20 20  |ust now         |
-1 00000240  20 20 50 52 20 23 34 32  20 6f 70 65 6e 20 c2 b7  |  PR #42 open ..|
-1 00000250  20 43 49 e2 9c 97 20 50  75 6c 6c 20 52 65 71 75  | CI... Pull Requ|
-1 00000260  65 73 74 20 43 e2 80 a6  29 0d 0a 20 20 6d 61 69  |est C...)..  mai|
-1 00000270  6e 20 20 20 20 20 20 20  20 20 20 20 20 20 20 20  |n               |
-1 00000280  20 20 20 20 20 20 32 20  64 61 79 73 20 61 67 6f  |      2 days ago|
-1 00000290  20 20 20 20 20 20 20 20  20 4e 6f 20 50 52 20 c2  |         No PR .|
-1 000002a0  b7 20 6d 61 69 6e 2d 77  74 20 28 39 31 35 35 29  |. main-wt (9155)|
-1 000002b0  20 20 20 20 20 20 20 20  20 20 20 20 0d 0a 1b 5b  |            ...[|
-1 000002c0  32 41 0d 1b 5b 4a 2a 20  64 65 6d 6f 2d 62 72 61  |2A..[J* demo-bra|
-1 000002d0  6e 63 68 20 20 64 69 72  74 79 20 20 20 20 20 20  |nch  dirty      |
-1 000002e0  20 6a 75 73 74 20 6e 6f  77 20 20 20 20 20 20 20  | just now       |
-1 000002f0  20 20 20 20 50 52 20 23  34 32 20 6f 70 65 6e 20  |    PR #42 open |
-1 00000300  c2 b7 20 43 49 e2 9c 97  20 50 75 6c 6c 20 52 65  |.. CI... Pull Re|
-1 00000310  71 75 65 73 74 20 43 e2  80 a6 29 0d 0a 20 20 6d  |quest C...)..  m|
-1 00000320  61 69 6e 20 20 20 20 20  20 20 20 20 20 20 20 20  |ain             |
-1 00000330  20 20 20 20 20 20 20 20  32 20 64 61 79 73 20 61  |        2 days a|
-1 00000340  67 6f 20 20 20 20 20 20  20 20 20 4e 6f 20 50 52  |go         No PR|
-1 00000350  20 c2 b7 20 43 49 e2 9c  93 20 c2 b7 20 6d 61 69  | .. CI... .. mai|
-1 00000360  6e 2d 77 74 20 28 39 31  35 35 29 20 20 20 20 20  |n-wt (9155)     |
-1 00000370  20 0d 0a 0d 0a 43 49 20  64 65 74 61 69 6c 73 20  | ....CI details |
-1 00000380  28 64 65 6d 6f 2d 62 72  61 6e 63 68 29 3a 0d 0a  |(demo-branch):..|
-1 00000390  2d 20 50 75 6c 6c 20 52  65 71 75 65 73 74 20 43  |- Pull Request C|
-1 000003a0  68 65 63 6b 73 20 e2 80  94 20 66 61 69 6c 75 72  |hecks ... failur|
-1 000003b0  65 0d 0a 20 20 73 74 61  72 74 65 64 20 31 20 6d  |e..  started 1 m|
-1 000003c0  69 6e 20 61 67 6f 20 c2  b7 20 63 6f 6d 70 6c 65  |in ago .. comple|
-1 000003d0  74 65 64 20 31 73 20 61  67 6f 0d 0a 20 20 68 74  |ted 1s ago..  ht|
-1 000003e0  74 70 73 3a 2f 2f 65 78  61 6d 70 6c 65 2e 63 6f  |tps://example.co|
-1 000003f0  6d 2f 72 75 6e 2f 70 72  2d 34 32 0d 0a           |m/run/pr-42..|
-1 000003fd
+1 000001e0  20 20 20 20 20 20 20 6d  61 69 6e 2d 77 74 20 28  |       main-wt (|
+1 000001f0  39 31 35 35 29 20 20 20  20 20 20 20 20 20 20 20  |9155)           |
+1 00000200  20 20 20 20 20 20 20 20  20 0d 0a 1b 5b 32 41 0d  |         ...[2A.|
+1 00000210  1b 5b 4a 2a 20 64 65 6d  6f 2d 62 72 61 6e 63 68  |.[J* demo-branch|
+1 00000220  20 20 64 69 72 74 79 20  20 20 20 20 20 20 6a 75  |  dirty       ju|
+1 00000230  73 74 20 6e 6f 77 20 20  20 20 20 20 20 20 20 20  |st now          |
+1 00000240  20 50 52 20 23 34 32 20  6f 70 65 6e 20 c2 b7 20  | PR #42 open .. |
+1 00000250  43 49 e2 9c 97 20 50 75  6c 6c 20 52 65 71 75 65  |CI... Pull Reque|
+1 00000260  73 74 20 43 e2 80 a6 29  0d 0a 20 20 6d 61 69 6e  |st C...)..  main|
+1 00000270  20 20 20 20 20 20 20 20  20 20 20 20 20 20 20 20  |                |
+1 00000280  20 20 20 20 20 32 20 64  61 79 73 20 61 67 6f 20  |     2 days ago |
+1 00000290  20 20 20 20 20 20 20 20  6d 61 69 6e 2d 77 74 20  |        main-wt |
+1 000002a0  28 39 31 35 35 29 20 20  20 20 20 20 20 20 20 20  |(9155)          |
+1 000002b0  20 20 20 20 20 20 20 20  20 20 0d 0a 1b 5b 32 41  |          ...[2A|
+1 000002c0  0d 1b 5b 4a 2a 20 64 65  6d 6f 2d 62 72 61 6e 63  |..[J* demo-branc|
+1 000002d0  68 20 20 64 69 72 74 79  20 20 20 20 20 20 20 6a  |h  dirty       j|
+1 000002e0  75 73 74 20 6e 6f 77 20  20 20 20 20 20 20 20 20  |ust now         |
+1 000002f0  20 20 50 52 20 23 34 32  20 6f 70 65 6e 20 c2 b7  |  PR #42 open ..|
+1 00000300  20 43 49 e2 9c 97 20 50  75 6c 6c 20 52 65 71 75  | CI... Pull Requ|
+1 00000310  65 73 74 20 43 e2 80 a6  29 0d 0a 20 20 6d 61 69  |est C...)..  mai|
+1 00000320  6e 20 20 20 20 20 20 20  20 20 20 20 20 20 20 20  |n               |
+1 00000330  20 20 20 20 20 20 32 20  64 61 79 73 20 61 67 6f  |      2 days ago|
+1 00000340  20 20 20 20 20 20 20 20  20 43 49 e2 9c 93 20 c2  |         CI... .|
+1 00000350  b7 20 6d 61 69 6e 2d 77  74 20 28 39 31 35 35 29  |. main-wt (9155)|
+1 00000360  20 20 20 20 20 20 20 20  20 20 20 20 20 20 0d 0a  |              ..|
+1 00000370  0d 0a 43 49 20 64 65 74  61 69 6c 73 20 28 64 65  |..CI details (de|
+1 00000380  6d 6f 2d 62 72 61 6e 63  68 29 3a 0d 0a 2d 20 50  |mo-branch):..- P|
+1 00000390  75 6c 6c 20 52 65 71 75  65 73 74 20 43 68 65 63  |ull Request Chec|
+1 000003a0  6b 73 20 e2 80 94 20 66  61 69 6c 75 72 65 0d 0a  |ks ... failure..|
+1 000003b0  20 20 73 74 61 72 74 65  64 20 31 20 6d 69 6e 20  |  started 1 min |
+1 000003c0  61 67 6f 20 c2 b7 20 63  6f 6d 70 6c 65 74 65 64  |ago .. completed|
+1 000003d0  20 31 73 20 61 67 6f 0d  0a 20 20 68 74 74 70 73  | 1s ago..  https|
+1 000003e0  3a 2f 2f 65 78 61 6d 70  6c 65 2e 63 6f 6d 2f 72  |://example.com/r|
+1 000003f0  75 6e 2f 70 72 2d 34 32  0d 0a                    |un/pr-42..|
+1 000003fa
 
 $ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new solo-branch --base main >/dev/null 2>&1 && cd ../solo-branch && echo solo >>README.md && git add README.md && git commit -m "solo change" >/dev/null && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-04T00:00:00Z" && printf '"'"'[{"pid":9404,"command":"solo","cwd":"%s"}]\n'"'"' "$(pwd)" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && ../../bin/wt'
-1 * solo-branch  dirty       just now           No PR · CI✓ · solo (9404)                                                       
-1   main                     3 days ago         No PR · CI✓                                                                     
+1 * solo-branch  dirty       just now           CI✓ · solo (9404)                                                               
+1   main                     3 days ago         CI✓                                                                             

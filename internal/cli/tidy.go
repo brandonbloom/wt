@@ -49,6 +49,11 @@ const blockReasonCurrentWorktree = "currently inside this worktree"
 
 const tidyPromptLogLimit = 10
 
+type tidyDeriveContext struct {
+	Now      time.Time
+	Workflow workflowExpectations
+}
+
 type tidyOptions struct {
 	dryRun      bool
 	policyFlag  string
@@ -90,7 +95,8 @@ func runTidy(cmd *cobra.Command, opts *tidyOptions) error {
 	if err != nil {
 		return err
 	}
-	defaultCompareRef := defaultBranchComparisonRef(proj)
+	compareCtx := defaultBranchComparisonContext(proj)
+	workflow := workflowExpectationsForProject(compareCtx)
 	ciRepo, ciRepoErr := resolveGitHubRepo(proj)
 
 	initialWD, err := os.Getwd()
@@ -123,7 +129,7 @@ func runTidy(cmd *cobra.Command, opts *tidyOptions) error {
 	}
 
 	now := currentTimeOverride()
-	candidates, err := collectTidyCandidates(cmd.Context(), proj, defaultCompareRef, now)
+	candidates, err := collectTidyCandidates(cmd.Context(), proj, compareCtx.CompareRef, now)
 	if err != nil {
 		return err
 	}
@@ -147,9 +153,10 @@ func runTidy(cmd *cobra.Command, opts *tidyOptions) error {
 	if err := fetchCIStatuses(cmd.Context(), ciOpts, ui.statuses, now, nil); err != nil && !errors.Is(err, context.Canceled) {
 		fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s\n", singleLineError(err))
 	}
-	updateCandidatesCIState(candidates)
+	updateCandidatesCIState(candidates, workflow)
 
-	safe, gray, blocked := classifyCandidates(candidates, now, ui)
+	deriveCtx := tidyDeriveContext{Now: now, Workflow: workflow}
+	safe, gray, blocked := classifyCandidates(candidates, deriveCtx, ui)
 
 	var killPlan *killSettings
 	if killEnabled {
@@ -162,7 +169,7 @@ func runTidy(cmd *cobra.Command, opts *tidyOptions) error {
 			if err := attachProcessesToCandidates(candidates); err != nil {
 				return err
 			}
-			safe, gray, blocked = classifyCandidates(candidates, now, ui)
+			safe, gray, blocked = classifyCandidates(candidates, deriveCtx, ui)
 		}
 	}
 
@@ -418,12 +425,12 @@ func fetchTidyPullRequests(ctx context.Context, candidates []*tidyCandidate, ui 
 	return combined
 }
 
-func classifyCandidates(candidates []*tidyCandidate, now time.Time, ui *tidyUI) ([]*tidyCandidate, []*tidyCandidate, []*tidyCandidate) {
+func classifyCandidates(candidates []*tidyCandidate, deriveCtx tidyDeriveContext, ui *tidyUI) ([]*tidyCandidate, []*tidyCandidate, []*tidyCandidate) {
 	safe := make([]*tidyCandidate, 0)
 	gray := make([]*tidyCandidate, 0)
 	blocked := make([]*tidyCandidate, 0)
 	for _, cand := range candidates {
-		deriveClassification(cand, now)
+		deriveClassification(cand, deriveCtx)
 		ui.Update(cand)
 		switch cand.Classification {
 		case tidySafe:
@@ -437,7 +444,7 @@ func classifyCandidates(candidates []*tidyCandidate, now time.Time, ui *tidyUI) 
 	return safe, gray, blocked
 }
 
-func deriveClassification(cand *tidyCandidate, now time.Time) {
+func deriveClassification(cand *tidyCandidate, deriveCtx tidyDeriveContext) {
 	if len(cand.BlockReasons) > 0 {
 		cand.Classification = tidyBlocked
 		if cand.Stage != tidyStageCleaning && cand.Stage != tidyStageCleaned {
@@ -463,7 +470,7 @@ func deriveClassification(cand *tidyCandidate, now time.Time) {
 			summary := summarizePullRequestState(prContext{
 				HasPendingWork:   cand.hasPendingWork(),
 				HasUniqueCommits: cand.UniqueAhead > 0,
-			}, cand.PRs)
+			}, cand.PRs, deriveCtx.Workflow)
 			if summary.Reason != "" {
 				reasons = append(reasons, summary.Reason)
 			}
@@ -475,7 +482,7 @@ func deriveClassification(cand *tidyCandidate, now time.Time) {
 			}
 		}
 		if cand.staleCutoffDays > 0 {
-			daysOld := int(now.Sub(cand.LastActivity).Hours() / 24)
+			daysOld := int(deriveCtx.Now.Sub(cand.LastActivity).Hours() / 24)
 			if daysOld > cand.staleCutoffDays {
 				reasons = append(reasons, fmt.Sprintf("stale for %d days", daysOld))
 			}
@@ -1058,18 +1065,6 @@ func makeTreeWritable(root string) error {
 	})
 }
 
-func closePullRequest(ctx context.Context, dir, branch string, number int) error {
-	comment := fmt.Sprintf("Closed via wt tidy (branch %s)", branch)
-	cmd := exec.CommandContext(ctx, "gh", "pr", "close", fmt.Sprintf("%d", number), "--comment", comment)
-	cmd.Dir = dir
-	cmd.Stdout = io.Discard
-	cmd.Stderr = io.Discard
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("gh pr close #%d: %w", number, err)
-	}
-	return nil
-}
-
 type tidyUI struct {
 	interactive bool
 	renderer    *statusRenderer
@@ -1154,7 +1149,7 @@ func populateStatusFromCandidate(cand *tidyCandidate, status *worktreeStatus, no
 	summary := summarizePullRequestState(prContext{
 		HasPendingWork:   status.HasPendingWork,
 		HasUniqueCommits: cand.UniqueAhead > 0,
-	}, cand.PRs)
+	}, cand.PRs, workflowExpectations{PRsExpected: true})
 	status.Operation = summary.Operation
 	status.PRStatus = tidyActionLabel(cand)
 	status.NeedsInput = cand.Stage == tidyStagePrompt
@@ -1166,20 +1161,23 @@ func populateStatusFromCandidate(cand *tidyCandidate, status *worktreeStatus, no
 	status.CIState = cand.CIState
 }
 
-func updateCandidatesCIState(candidates []*tidyCandidate) {
+func updateCandidatesCIState(candidates []*tidyCandidate, workflow workflowExpectations) {
 	for _, cand := range candidates {
 		if cand == nil || cand.status == nil {
 			continue
 		}
-		applyCandidateCIState(cand, cand.status)
+		applyCandidateCIState(cand, cand.status, workflow)
 	}
 }
 
-func applyCandidateCIState(cand *tidyCandidate, status *worktreeStatus) {
+func applyCandidateCIState(cand *tidyCandidate, status *worktreeStatus, workflow workflowExpectations) {
 	removeCIGrayReason(cand)
 	cand.CIState = status.CIState
 	cand.CIStatus = status.CIStatus
-	if reason := ciGrayReason(status.CIState); reason != "" {
+	if reason := ciGrayReason(status.CIState, ciGrayReasonContext{
+		HasPendingWork: cand.hasPendingWork(),
+		Workflow:       workflow,
+	}); reason != "" {
 		cand.extraGrayReasons = append(cand.extraGrayReasons, reason)
 	}
 }
@@ -1198,11 +1196,22 @@ func removeCIGrayReason(cand *tidyCandidate) {
 	cand.extraGrayReasons = filtered
 }
 
-func ciGrayReason(state ciState) string {
+type ciGrayReasonContext struct {
+	HasPendingWork bool
+	Workflow       workflowExpectations
+}
+
+func ciGrayReason(state ciState, ctx ciGrayReasonContext) string {
+	if !ctx.HasPendingWork {
+		return ""
+	}
 	switch state {
 	case ciStateFailure:
 		return "CI failed"
 	case ciStateError, ciStateUnknown:
+		if !ctx.Workflow.PRsExpected {
+			return ""
+		}
 		return "CI status unknown"
 	default:
 		return ""

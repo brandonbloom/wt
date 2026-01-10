@@ -46,7 +46,8 @@ func runRm(cmd *cobra.Command, opts *rmOptions, args []string) error {
 	if err != nil {
 		return err
 	}
-	defaultCompareRef := defaultBranchComparisonRef(proj)
+	compareCtx := defaultBranchComparisonContext(proj)
+	workflow := workflowExpectationsForProject(compareCtx)
 	ciRepo, ciRepoErr := resolveGitHubRepo(proj)
 
 	initialWD, err := os.Getwd()
@@ -65,7 +66,7 @@ func runRm(cmd *cobra.Command, opts *rmOptions, args []string) error {
 	}
 
 	now := currentTimeOverride()
-	candidates, err := collectTidyCandidates(cmd.Context(), proj, defaultCompareRef, now)
+	candidates, err := collectTidyCandidates(cmd.Context(), proj, compareCtx.CompareRef, now)
 	if err != nil {
 		return err
 	}
@@ -123,10 +124,10 @@ func runRm(cmd *cobra.Command, opts *rmOptions, args []string) error {
 	if err := fetchCIStatuses(cmd.Context(), ciOpts, statuses, now, nil); err != nil && errors.Is(err, context.Canceled) {
 		fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s\n", singleLineError(err))
 	}
-	updateCandidatesCIState(targetCands)
+	updateCandidatesCIState(targetCands, workflow)
 
 	for _, cand := range targetCands {
-		deriveClassification(cand, now)
+		deriveClassification(cand, tidyDeriveContext{Now: now, Workflow: workflow})
 		if cand.Classification == tidyBlocked {
 			return fmt.Errorf("cannot remove %s: %s", cand.Worktree.Name, strings.Join(cand.BlockReasons, "; "))
 		}

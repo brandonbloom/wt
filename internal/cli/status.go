@@ -683,6 +683,9 @@ func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus, w
 	if strings.TrimSpace(os.Getenv("WT_TEST_SERIAL_FETCH")) != "" {
 		var combined error
 		for _, status := range statuses {
+			if status == nil || status.HasError || status.Error != "" {
+				continue
+			}
 			prs, err := queryPullRequests(ctx, status.Path, status.Branch)
 			if errors.Is(err, context.Canceled) {
 				markPRInterrupted(statuses, onUpdate)
@@ -723,6 +726,9 @@ func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus, w
 	var wg sync.WaitGroup
 	for _, status := range statuses {
 		status := status
+		if status == nil || status.HasError || status.Error != "" {
+			continue
+		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()

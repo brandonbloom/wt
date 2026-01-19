@@ -7,4 +7,3 @@ type workflowExpectations struct {
 func workflowExpectationsForProject(compareCtx defaultBranchCompareContext) workflowExpectations {
 	return workflowExpectations{PRsExpected: compareCtx.PRsExpected}
 }
-

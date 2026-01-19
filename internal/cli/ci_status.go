@@ -86,6 +86,9 @@ func fetchCIStatuses(ctx context.Context, opts ciFetchOptions, statuses []*workt
 	if strings.TrimSpace(os.Getenv("WT_TEST_SERIAL_FETCH")) != "" {
 		var combined error
 		for _, status := range statuses {
+			if status == nil || status.HasError || status.Error != "" {
+				continue
+			}
 			target, err := determineCITarget(status)
 			if err != nil {
 				setCIError(status, fmt.Sprintf("CI: ? %s", err.Error()), ciStateError)
@@ -124,6 +127,9 @@ func fetchCIStatuses(ctx context.Context, opts ciFetchOptions, statuses []*workt
 			msg = fmt.Sprintf("CI: ? remote %s missing", opts.RemoteName)
 		}
 		for _, status := range statuses {
+			if status == nil || status.HasError || status.Error != "" {
+				continue
+			}
 			setCIError(status, msg, ciStateError)
 			if onUpdate != nil {
 				onUpdate(status)
@@ -137,6 +143,9 @@ func fetchCIStatuses(ctx context.Context, opts ciFetchOptions, statuses []*workt
 
 	keyed := make(map[string]*ciRequest)
 	for idx, status := range statuses {
+		if status == nil || status.HasError || status.Error != "" {
+			continue
+		}
 		target, err := determineCITarget(status)
 		if err != nil {
 			setCIError(status, fmt.Sprintf("CI: ? %s", err.Error()), ciStateError)

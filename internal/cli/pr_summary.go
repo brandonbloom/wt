@@ -86,9 +86,6 @@ type prContext struct {
 
 func summarizePullRequestState(ctx prContext, prs []pullRequestInfo, workflow workflowExpectations) prSummary {
 	if !ctx.HasPendingWork {
-		if workflow.PRsExpected {
-			return prSummary{Column: "No PR"}
-		}
 		return prSummary{Column: ""}
 	}
 	active := openPullRequests(prs)

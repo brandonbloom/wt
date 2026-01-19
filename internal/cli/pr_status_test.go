@@ -1,6 +1,9 @@
 package cli
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestMarkPRInterrupted(t *testing.T) {
 	statuses := []*worktreeStatus{
@@ -31,5 +34,27 @@ func TestMarkPRInterrupted(t *testing.T) {
 	}
 	if statuses[2].PRStatus != prInterruptedLabel {
 		t.Fatalf("status 2 PRStatus = %q, want %q", statuses[2].PRStatus, prInterruptedLabel)
+	}
+}
+
+func TestFetchPullRequestStatuses_SkipsStatusesWithErrors(t *testing.T) {
+	statuses := []*worktreeStatus{
+		{
+			Name:      "broken",
+			HasError:  true,
+			Error:     "git failed",
+			PRStatus:  "error: git failed",
+			Branch:    "",
+			Path:      "/does/not/matter",
+			HeadHash:  "",
+			Timestamp: currentTimeOverride(),
+		},
+	}
+
+	if err := fetchPullRequestStatuses(context.Background(), statuses, workflowExpectations{PRsExpected: true}, nil); err != nil {
+		t.Fatalf("fetchPullRequestStatuses returned error: %v", err)
+	}
+	if got := statuses[0].PRStatus; got != "error: git failed" {
+		t.Fatalf("PRStatus = %q, want %q", got, "error: git failed")
 	}
 }

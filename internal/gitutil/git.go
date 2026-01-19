@@ -162,7 +162,7 @@ func AheadBehind(dir, branch string) (ahead, behind int, err error) {
 	}
 	out, err := Run(dir, "rev-list", "--left-right", "--count", "@{u}...HEAD")
 	if err != nil {
-		if strings.Contains(err.Error(), "no upstream") {
+		if isMissingUpstreamError(err) {
 			if ahead, behind, ok, fbErr := aheadBehindFromRemote(dir, branch); fbErr == nil && ok {
 				return ahead, behind, nil
 			}
@@ -183,6 +183,22 @@ func AheadBehind(dir, branch string) (ahead, behind int, err error) {
 		return 0, 0, err
 	}
 	return ahead, behind, nil
+}
+
+func isMissingUpstreamError(err error) bool {
+	if err == nil {
+		return false
+	}
+	lower := strings.ToLower(err.Error())
+	if strings.Contains(lower, "no upstream") {
+		return true
+	}
+	if strings.Contains(lower, "@{u}") {
+		if strings.Contains(lower, "unknown revision") || strings.Contains(lower, "ambiguous argument") {
+			return true
+		}
+	}
+	return false
 }
 
 // HeadTimestamp returns the timestamp of the HEAD commit.
@@ -392,11 +408,11 @@ const (
 // first or remote-first workflow.
 //
 // Policy:
-// - If refs/remotes/<remote>/<defaultBranch> is missing, return <defaultBranch>
-//   (local-first).
-// - If the local default branch is ahead of the remote-tracking default branch,
-//   return <defaultBranch> (local-first).
-// - Otherwise return <remote>/<defaultBranch> (remote-first).
+//   - If refs/remotes/<remote>/<defaultBranch> is missing, return <defaultBranch>
+//     (local-first).
+//   - If the local default branch is ahead of the remote-tracking default branch,
+//     return <defaultBranch> (local-first).
+//   - Otherwise return <remote>/<defaultBranch> (remote-first).
 func DefaultBranchComparisonRef(dir, remote, defaultBranch string) (string, DefaultBranchSyncMode, error) {
 	defaultBranch = strings.TrimSpace(defaultBranch)
 	if defaultBranch == "" {

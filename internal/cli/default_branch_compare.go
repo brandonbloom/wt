@@ -8,9 +8,9 @@ import (
 )
 
 type defaultBranchCompareContext struct {
-	CompareRef   string
-	PRsExpected  bool
-	SyncMode     gitutil.DefaultBranchSyncMode
+	CompareRef    string
+	PRsExpected   bool
+	SyncMode      gitutil.DefaultBranchSyncMode
 	DefaultBranch string
 }
 

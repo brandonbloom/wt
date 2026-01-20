@@ -29,9 +29,6 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	compareCtx := defaultBranchComparisonContext(proj)
-	workflow := workflowExpectationsForProject(compareCtx)
-	ciRepo, ciRepoErr := resolveGitHubRepo(proj)
 
 	worktrees, err := project.ListWorktrees(proj.Root)
 	if err != nil {
@@ -52,43 +49,22 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	now := currentTimeOverride()
-	statuses := make([]*worktreeStatus, 0, len(worktrees))
-	for _, wt := range worktrees {
-		status, err := collectWorktreeStatus(proj, wt, compareCtx.CompareRef)
-		if err != nil {
-			msg := singleLineError(err)
-			if friendly, ok := friendlyWorktreeGitError(wt.Name, err); ok {
-				msg = friendly
-			}
-			statuses = append(statuses, &worktreeStatus{
-				Name:      wt.Name,
-				Path:      wt.Path,
-				Branch:    wt.Name,
-				Timestamp: now,
-				PRStatus:  fmt.Sprintf("error: %s", msg),
-				Error:     msg,
-				HasError:  true,
-			})
-			continue
-		}
-		status.Current = wt.Name == current
-		status.PRStatus = prLoadingLabel
-		statuses = append(statuses, status)
-	}
-
-	if err := attachProcessesToStatuses(statuses, worktrees); err != nil {
-		return err
-	}
-
-	sort.SliceStable(statuses, func(i, j int) bool {
-		if statuses[i].Timestamp.Equal(statuses[j].Timestamp) {
-			return statuses[i].Name < statuses[j].Name
-		}
-		return statuses[i].Timestamp.After(statuses[j].Timestamp)
-	})
-
 	out := cmd.OutOrStdout()
 	termWidth, isTTY := terminalWidth(out)
+
+	// Render a placeholder table immediately on TTYs; fill in the expensive git +
+	// process details after the first print.
+	statuses := make([]*worktreeStatus, 0, len(worktrees))
+	for _, wt := range worktrees {
+		statuses = append(statuses, &worktreeStatus{
+			Name:     wt.Name,
+			Path:     wt.Path,
+			Branch:   wt.Name,
+			Current:  wt.Name == current,
+			PRStatus: prLoadingLabel,
+		})
+	}
+
 	layout := buildColumnLayout(statuses, now, termWidth)
 	layout.useColor = isTTY
 	if os.Getenv("WT_DEBUG_STATUS") != "" {
@@ -109,6 +85,51 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		rerender = func(*worktreeStatus) {
 			renderer.Render(statuses, layout, now)
 		}
+	}
+
+	compareCtx := defaultBranchComparisonContext(proj)
+	workflow := workflowExpectationsForProject(compareCtx)
+	ciRepo, ciRepoErr := resolveGitHubRepo(proj)
+
+	for i, wt := range worktrees {
+		status, err := collectWorktreeStatus(proj, wt, compareCtx.CompareRef)
+		if err != nil {
+			msg := singleLineError(err)
+			if friendly, ok := friendlyWorktreeGitError(wt.Name, err); ok {
+				msg = friendly
+			}
+			statuses[i] = &worktreeStatus{
+				Name:      wt.Name,
+				Path:      wt.Path,
+				Branch:    wt.Name,
+				Timestamp: now,
+				PRStatus:  fmt.Sprintf("error: %s", msg),
+				Error:     msg,
+				HasError:  true,
+				Current:   wt.Name == current,
+			}
+			continue
+		}
+		status.Current = wt.Name == current
+		status.PRStatus = prLoadingLabel
+		statuses[i] = status
+	}
+
+	if err := attachProcessesToStatuses(statuses, worktrees); err != nil {
+		return err
+	}
+
+	sort.SliceStable(statuses, func(i, j int) bool {
+		if statuses[i].Timestamp.Equal(statuses[j].Timestamp) {
+			return statuses[i].Name < statuses[j].Name
+		}
+		return statuses[i].Timestamp.After(statuses[j].Timestamp)
+	})
+
+	layout = buildColumnLayout(statuses, now, termWidth)
+	layout.useColor = isTTY
+	if renderer != nil {
+		renderer.Render(statuses, layout, now)
 	}
 
 	err = fetchPullRequestStatuses(ctx, statuses, workflow, rerender)

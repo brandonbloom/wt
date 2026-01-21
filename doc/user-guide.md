@@ -34,7 +34,7 @@ Key rules:
 - Exactly one default worktree exists and is named `main` (preferred) or `master`.
 - `.wt/` sits beside every worktree and holds `config.toml`. The directory is not part of git so it can store machine-local settings.
 - Additional worktrees live alongside the default, each mapped to a git worktree and branch of the same name.
-- Commands discover the project root by walking up from the current directory until a `.wt/` directory is found, so you can run `wt` from any worktree. Missing `.wt/` directories trigger an error that instructs you to run `wt init`.
+- Commands discover the project root by walking up from the current directory until a `.wt/` directory is found, so you can run `wt` from any worktree. Missing `.wt/` directories trigger an error that instructs you to run `wt init`. Use `wt -C <dir> …` (or `--directory`) to point `wt` at a project while you’re currently somewhere else.
 
 ## Initializing Repositories
 

@@ -1,0 +1,6 @@
+$ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'set -euo pipefail; cd /tmp; /tmp/wt-transcripts/bin/wt status'
+2 run `wt init` to create a project in this directory
+? 1
+
+$ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'set -euo pipefail; cd /tmp; export WT_NOW="2000-01-01T00:00:01Z"; export WT_TEST_SERIAL_FETCH="1"; export WT_PROCESS_TEST_DATA="[]"; /tmp/wt-transcripts/bin/wt -C /tmp/wt-transcripts/tmprepo status | tr -s " " | sed "s/^ *//;s/ *$//"'
+1 main 1s ago CI✓

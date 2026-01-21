@@ -2,6 +2,7 @@ package gitutil
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -451,6 +452,33 @@ func DefaultBranchComparisonRef(dir, remote, defaultBranch string) (string, Defa
 		return defaultBranch, DefaultBranchLocalFirst, nil
 	}
 	return fmt.Sprintf("%s/%s", remote, defaultBranch), DefaultBranchRemoteFirst, nil
+}
+
+// FetchRemoteDefaultBranch updates refs/remotes/<remote>/<defaultBranch> in the
+// local repository, making remote-first comparisons reflect the latest default
+// branch tip.
+func FetchRemoteDefaultBranch(ctx context.Context, dir, remote, defaultBranch string) error {
+	defaultBranch = strings.TrimSpace(defaultBranch)
+	if defaultBranch == "" || strings.TrimSpace(dir) == "" {
+		return nil
+	}
+	remote = strings.TrimSpace(remote)
+	if remote == "" {
+		remote = "origin"
+	}
+
+	cmd := exec.CommandContext(ctx, "git", "-C", dir, "fetch", "--quiet", remote, defaultBranch)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	cmd.Stdin = os.Stdin
+	if err := cmd.Run(); err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg == "" {
+			msg = err.Error()
+		}
+		return fmt.Errorf("git fetch %s %s: %s", remote, defaultBranch, msg)
+	}
+	return nil
 }
 
 func aheadBehindAgainstRef(dir, ref string) (ahead, behind int, err error) {

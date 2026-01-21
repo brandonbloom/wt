@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/brandonbloom/wt/internal/gitutil"
 	"github.com/brandonbloom/wt/internal/processes"
 	"github.com/brandonbloom/wt/internal/project"
 	"github.com/brandonbloom/wt/internal/timefmt"
@@ -98,6 +99,12 @@ func runTidy(cmd *cobra.Command, opts *tidyOptions) error {
 	compareCtx := defaultBranchComparisonContext(proj)
 	workflow := workflowExpectationsForProject(compareCtx)
 	ciRepo, ciRepoErr := resolveGitHubRepo(proj)
+
+	if compareCtx.SyncMode == gitutil.DefaultBranchRemoteFirst {
+		if err := gitutil.FetchRemoteDefaultBranch(cmd.Context(), proj.DefaultWorktreePath, "origin", compareCtx.DefaultBranch); err != nil {
+			fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s\n", singleLineError(err))
+		}
+	}
 
 	initialWD, err := os.Getwd()
 	if err != nil {

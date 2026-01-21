@@ -1,0 +1,10 @@
+$ ./transcripts/entrypoint.sh bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; remote_url="file://$(pwd)/remote.git"; cd main; git config url."$remote_url".insteadOf git@github.com:brandonbloom/wt.git; git push -u origin HEAD:main >/dev/null 2>&1; git fetch origin >/dev/null 2>&1; ../../bin/wt new squash-branch --base origin/main >/dev/null 2>&1; cd ../squash-branch; echo squash >>README.md; git add README.md; git commit -m "squash change" >/dev/null; git push -u origin HEAD:squash-branch >/dev/null 2>&1; cd ..; git clone remote.git .wt/other >/dev/null 2>&1; cd .wt/other; git fetch origin >/dev/null 2>&1; git merge --squash origin/squash-branch >/dev/null; git commit -m "squashed merge" >/dev/null; git push origin HEAD:main >/dev/null 2>&1; cd ../../main; printf "%s\n" "squash-branch|201|MERGED|false|2000-01-05T00:00:00Z|https://example.com/pr/201" >"$WT_GH_STATE_FILE"; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-01-10T00:00:00Z ../../bin/wt tidy -n'
+1 Will clean up:
+1 - squash-branch (branch squash-branch)
+1     remove worktree /tmp/wt-transcripts/tmprepo/squash-branch
+1     delete local branch squash-branch
+1     delete remote branch origin/squash-branch
+1
+1
+1 Remote maintenance:
+1 - git remote prune origin

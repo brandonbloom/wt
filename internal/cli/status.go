@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"runtime"
 	"runtime/trace"
 	"sort"
 	"strconv"
@@ -107,7 +108,10 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		region := trace.StartRegion(ctx, "collect git status")
 		defer region.End()
 
-		parallelism := 8
+		parallelism := runtime.GOMAXPROCS(0)
+		if parallelism < 1 {
+			parallelism = 1
+		}
 		if len(worktrees) < parallelism {
 			parallelism = len(worktrees)
 		}

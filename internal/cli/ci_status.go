@@ -192,15 +192,12 @@ func fetchCIStatuses(ctx context.Context, opts ciFetchOptions, statuses []*workt
 
 	results := make(chan ciFetchResult, len(ordered))
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, 4)
 
 	for _, req := range ordered {
 		req := req
 		wg.Add(1)
-		sem <- struct{}{}
 		go func() {
 			defer wg.Done()
-			defer func() { <-sem }()
 			res, err := func() (ciResult, error) {
 				region := trace.StartRegion(ctx, "ci request")
 				defer region.End()

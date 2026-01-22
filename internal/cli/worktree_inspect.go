@@ -27,7 +27,29 @@ type worktreeGitData struct {
 	TreeMatchesDefault bool
 }
 
-func gatherWorktreeGitData(ctx context.Context, proj *project.Project, wt project.Worktree, defaultCompareRef string) (*worktreeGitData, error) {
+type gatherWorktreeGitDataOptions struct {
+	IncludeUniqueCommits bool
+	IncludeMergeState    bool
+	IncludeTreeMatch     bool
+	IncludeRemoteInfo    bool
+	StashBranches        map[string]bool
+}
+
+var gatherWorktreeGitDataOptionsStatus = gatherWorktreeGitDataOptions{
+	IncludeUniqueCommits: true,
+	IncludeMergeState:    false,
+	IncludeTreeMatch:     false,
+	IncludeRemoteInfo:    false,
+}
+
+var gatherWorktreeGitDataOptionsFull = gatherWorktreeGitDataOptions{
+	IncludeUniqueCommits: true,
+	IncludeMergeState:    true,
+	IncludeTreeMatch:     true,
+	IncludeRemoteInfo:    true,
+}
+
+func gatherWorktreeGitData(ctx context.Context, proj *project.Project, wt project.Worktree, defaultCompareRef string, opts gatherWorktreeGitDataOptions) (*worktreeGitData, error) {
 	data := &worktreeGitData{Worktree: wt}
 
 	branch, err := withTraceRegion(ctx, "git current branch", func() (string, error) {
@@ -48,6 +70,9 @@ func gatherWorktreeGitData(ctx context.Context, proj *project.Project, wt projec
 
 	if branch != "" {
 		stash, err := withTraceRegion(ctx, "git stash", func() (bool, error) {
+			if opts.StashBranches != nil {
+				return opts.StashBranches[branch], nil
+			}
 			return gitutil.HasBranchStash(wt.Path, branch)
 		})
 		if err != nil {
@@ -127,31 +152,37 @@ func gatherWorktreeGitData(ctx context.Context, proj *project.Project, wt projec
 		compareRef = proj.Config.DefaultBranch
 	}
 
-	merged, err := withTraceRegion(ctx, "git head merged into default", func() (bool, error) {
-		return gitutil.HeadMergedInto(wt.Path, compareRef)
-	})
-	if err != nil {
-		return nil, err
+	if opts.IncludeMergeState {
+		merged, err := withTraceRegion(ctx, "git head merged into default", func() (bool, error) {
+			return gitutil.HeadMergedInto(wt.Path, compareRef)
+		})
+		if err != nil {
+			return nil, err
+		}
+		data.MergedIntoDefault = merged
 	}
-	data.MergedIntoDefault = merged
 
-	treeMatches, err := withTraceRegion(ctx, "git head tree matches default", func() (bool, error) {
-		return gitutil.HeadSameTree(wt.Path, compareRef)
-	})
-	if err != nil {
-		return nil, err
+	if opts.IncludeTreeMatch {
+		treeMatches, err := withTraceRegion(ctx, "git head tree matches default", func() (bool, error) {
+			return gitutil.HeadSameTree(wt.Path, compareRef)
+		})
+		if err != nil {
+			return nil, err
+		}
+		data.TreeMatchesDefault = treeMatches
 	}
-	data.TreeMatchesDefault = treeMatches
 
-	uniqueAhead, err := withTraceRegion(ctx, "git unique commits", func() (int, error) {
-		return gitutil.UniqueCommitsComparedTo(wt.Path, compareRef)
-	})
-	if err != nil {
-		return nil, err
+	if opts.IncludeUniqueCommits {
+		uniqueAhead, err := withTraceRegion(ctx, "git unique commits", func() (int, error) {
+			return gitutil.UniqueCommitsComparedTo(wt.Path, compareRef)
+		})
+		if err != nil {
+			return nil, err
+		}
+		data.UniqueAhead = uniqueAhead
 	}
-	data.UniqueAhead = uniqueAhead
 
-	if proj.DefaultWorktreePath != "" {
+	if opts.IncludeRemoteInfo && proj.DefaultWorktreePath != "" {
 		remoteHash, exists, err := func() (string, bool, error) {
 			type remoteBranch struct {
 				hash   string

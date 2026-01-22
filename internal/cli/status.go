@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"runtime/trace"
 	"sort"
@@ -15,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/brandonbloom/wt/internal/gitutil"
 	"github.com/brandonbloom/wt/internal/processes"
 	"github.com/brandonbloom/wt/internal/project"
 	"github.com/brandonbloom/wt/internal/shellbridge"
@@ -108,6 +110,22 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		region := trace.StartRegion(ctx, "collect git status")
 		defer region.End()
 
+		stashBranches, stashErr := func() (map[string]bool, error) {
+			stashRegion := trace.StartRegion(ctx, "git stash index")
+			defer stashRegion.End()
+			workdir := proj.DefaultWorktreePath
+			if workdir == "" && proj.Root != "" && proj.DefaultWorktree != "" {
+				workdir = filepath.Join(proj.Root, proj.DefaultWorktree)
+			}
+			if workdir == "" {
+				return nil, nil
+			}
+			return gitutil.StashBranches(workdir)
+		}()
+		if stashErr != nil {
+			return stashErr
+		}
+
 		parallelism := runtime.GOMAXPROCS(0)
 		if parallelism < 1 {
 			parallelism = 1
@@ -129,7 +147,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 				status, werr := func() (*worktreeStatus, error) {
 					wtRegion := trace.StartRegion(ctx, "worktree "+wt.Name)
 					defer wtRegion.End()
-					return collectWorktreeStatus(ctx, proj, wt, compareCtx.CompareRef)
+					return collectWorktreeStatus(ctx, proj, wt, compareCtx.CompareRef, stashBranches)
 				}()
 				if werr != nil {
 					msg := singleLineError(werr)
@@ -246,8 +264,10 @@ type worktreeStatus struct {
 	CIDetail       []ciRunSummary
 }
 
-func collectWorktreeStatus(ctx context.Context, proj *project.Project, wt project.Worktree, defaultCompareRef string) (*worktreeStatus, error) {
-	data, err := gatherWorktreeGitData(ctx, proj, wt, defaultCompareRef)
+func collectWorktreeStatus(ctx context.Context, proj *project.Project, wt project.Worktree, defaultCompareRef string, stashBranches map[string]bool) (*worktreeStatus, error) {
+	opts := gatherWorktreeGitDataOptionsStatus
+	opts.StashBranches = stashBranches
+	data, err := gatherWorktreeGitData(ctx, proj, wt, defaultCompareRef, opts)
 	if err != nil {
 		return nil, err
 	}

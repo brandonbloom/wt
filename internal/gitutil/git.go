@@ -156,6 +156,35 @@ func HasBranchStash(dir, branch string) (bool, error) {
 	return false, nil
 }
 
+// StashBranches returns a set of branch names mentioned by stash entries.
+func StashBranches(dir string) (map[string]bool, error) {
+	out, err := Run(dir, "stash", "list")
+	if err != nil {
+		return nil, err
+	}
+	out = strings.TrimSpace(out)
+	if out == "" {
+		return map[string]bool{}, nil
+	}
+	branches := make(map[string]bool)
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if idx := strings.Index(line, " on "); idx >= 0 {
+			rest := line[idx+len(" on "):]
+			if end := strings.Index(rest, ":"); end > 0 {
+				branch := strings.TrimSpace(rest[:end])
+				if branch != "" {
+					branches[branch] = true
+				}
+			}
+		}
+	}
+	return branches, nil
+}
+
 // AheadBehind counts commits relative to upstream. Missing upstream yields zeros.
 func AheadBehind(dir, branch string) (ahead, behind int, err error) {
 	if ahead, behind, ok, err := aheadBehindFromStatus(dir); err == nil && ok {

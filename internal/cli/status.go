@@ -107,32 +107,54 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		region := trace.StartRegion(ctx, "collect git status")
 		defer region.End()
 
+		parallelism := 8
+		if len(worktrees) < parallelism {
+			parallelism = len(worktrees)
+		}
+		sem := make(chan struct{}, parallelism)
+
+		collected := make([]*worktreeStatus, len(worktrees))
+		var wg sync.WaitGroup
 		for i, wt := range worktrees {
-			status, werr := func() (*worktreeStatus, error) {
-				wtRegion := trace.StartRegion(ctx, "worktree "+wt.Name)
-				defer wtRegion.End()
-				return collectWorktreeStatus(ctx, proj, wt, compareCtx.CompareRef)
-			}()
-			if werr != nil {
-				msg := singleLineError(werr)
-				if friendly, ok := friendlyWorktreeGitError(wt.Name, werr); ok {
-					msg = friendly
+			wg.Add(1)
+			go func(i int, wt project.Worktree) {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+
+				status, werr := func() (*worktreeStatus, error) {
+					wtRegion := trace.StartRegion(ctx, "worktree "+wt.Name)
+					defer wtRegion.End()
+					return collectWorktreeStatus(ctx, proj, wt, compareCtx.CompareRef)
+				}()
+				if werr != nil {
+					msg := singleLineError(werr)
+					if friendly, ok := friendlyWorktreeGitError(wt.Name, werr); ok {
+						msg = friendly
+					}
+					collected[i] = &worktreeStatus{
+						Name:      wt.Name,
+						Path:      wt.Path,
+						Branch:    wt.Name,
+						Timestamp: now,
+						PRStatus:  fmt.Sprintf("error: %s", msg),
+						Error:     msg,
+						HasError:  true,
+						Current:   wt.Name == current,
+					}
+					return
 				}
-				statuses[i] = &worktreeStatus{
-					Name:      wt.Name,
-					Path:      wt.Path,
-					Branch:    wt.Name,
-					Timestamp: now,
-					PRStatus:  fmt.Sprintf("error: %s", msg),
-					Error:     msg,
-					HasError:  true,
-					Current:   wt.Name == current,
-				}
-				continue
+				status.Current = wt.Name == current
+				status.PRStatus = prLoadingLabel
+				collected[i] = status
+			}(i, wt)
+		}
+		wg.Wait()
+
+		for i := range collected {
+			if collected[i] != nil {
+				statuses[i] = collected[i]
 			}
-			status.Current = wt.Name == current
-			status.PRStatus = prLoadingLabel
-			statuses[i] = status
 		}
 	}
 

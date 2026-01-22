@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"runtime/trace"
 	"strings"
 	"time"
 )
@@ -26,6 +27,8 @@ func queryPullRequests(ctx context.Context, dir, branch string) ([]pullRequestIn
 	if branch == "" {
 		return nil, nil
 	}
+	region := trace.StartRegion(ctx, "gh pr list")
+	defer region.End()
 	cmd := exec.CommandContext(
 		ctx,
 		"gh",
@@ -48,6 +51,8 @@ func queryPullRequests(ctx context.Context, dir, branch string) ([]pullRequestIn
 		return nil, fmt.Errorf("gh pr list: %s", msg)
 	}
 
+	parseRegion := trace.StartRegion(ctx, "parse pr json")
+	defer parseRegion.End()
 	var raw []struct {
 		Number    int    `json:"number"`
 		State     string `json:"state"`

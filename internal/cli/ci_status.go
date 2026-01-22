@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"runtime/trace"
 	"sort"
 	"strings"
 	"sync"
@@ -84,6 +85,8 @@ func fetchCIStatuses(ctx context.Context, opts ciFetchOptions, statuses []*workt
 	}
 
 	if strings.TrimSpace(os.Getenv("WT_TEST_SERIAL_FETCH")) != "" {
+		serialRegion := trace.StartRegion(ctx, "fetch ci (serial)")
+		defer serialRegion.End()
 		var combined error
 		for _, status := range statuses {
 			if status == nil || status.HasError || status.Error != "" {
@@ -97,7 +100,11 @@ func fetchCIStatuses(ctx context.Context, opts ciFetchOptions, statuses []*workt
 				}
 				continue
 			}
-			res, err := fetchCITarget(ctx, opts, target)
+			res, err := func() (ciResult, error) {
+				region := trace.StartRegion(ctx, "ci "+status.Name)
+				defer region.End()
+				return fetchCITarget(ctx, opts, target)
+			}()
 			if errors.Is(err, context.Canceled) {
 				markCIInterrupted(statuses, onUpdate)
 				return err
@@ -118,6 +125,9 @@ func fetchCIStatuses(ctx context.Context, opts ciFetchOptions, statuses []*workt
 		}
 		return combined
 	}
+
+	batchRegion := trace.StartRegion(ctx, "fetch ci (batch)")
+	defer batchRegion.End()
 
 	if opts.Repo == nil {
 		msg := "CI: ? remote unavailable"
@@ -191,7 +201,12 @@ func fetchCIStatuses(ctx context.Context, opts ciFetchOptions, statuses []*workt
 		go func() {
 			defer wg.Done()
 			defer func() { <-sem }()
-			res, err := fetchCITarget(ctx, opts, req.target)
+			res, err := func() (ciResult, error) {
+				region := trace.StartRegion(ctx, "ci request")
+				defer region.End()
+				trace.Logf(ctx, "ci", "ref=%s branch=%s", req.target.Ref, req.target.Branch)
+				return fetchCITarget(ctx, opts, req.target)
+			}()
 			if errors.Is(err, context.Canceled) {
 				return
 			}
@@ -273,6 +288,9 @@ func determineCITarget(status *worktreeStatus) (ciTarget, error) {
 }
 
 func fetchCITarget(ctx context.Context, opts ciFetchOptions, target ciTarget) (ciResult, error) {
+	region := trace.StartRegion(ctx, "fetch ci target")
+	defer region.End()
+
 	path := fmt.Sprintf(
 		"repos/%s/commits/%s/check-runs",
 		opts.Repo.slug(),
@@ -283,7 +301,10 @@ func fetchCITarget(ctx context.Context, opts ciFetchOptions, target ciTarget) (c
 		return ciResult{}, err
 	}
 	var resp ghCheckRunsResponse
-	if err := json.Unmarshal(data, &resp); err != nil {
+	parseRegion := trace.StartRegion(ctx, "parse check-runs json")
+	err = json.Unmarshal(data, &resp)
+	parseRegion.End()
+	if err != nil {
 		return ciResult{}, err
 	}
 	if len(resp.CheckRuns) > 0 {
@@ -292,6 +313,7 @@ func fetchCITarget(ctx context.Context, opts ciFetchOptions, target ciTarget) (c
 	if target.Branch == "" {
 		return ciResult{State: ciStateUnknown}, nil
 	}
+	trace.Logf(ctx, "ci", "no check-runs; fallback to workflow runs")
 	fallback, err := fetchWorkflowFallback(ctx, opts, target)
 	if err != nil {
 		return ciResult{}, err
@@ -300,6 +322,9 @@ func fetchCITarget(ctx context.Context, opts ciFetchOptions, target ciTarget) (c
 }
 
 func fetchWorkflowFallback(ctx context.Context, opts ciFetchOptions, target ciTarget) (ciResult, error) {
+	region := trace.StartRegion(ctx, "fetch ci workflow fallback")
+	defer region.End()
+
 	args := []string{
 		"run", "list",
 		"--branch", target.Branch,
@@ -312,13 +337,23 @@ func fetchWorkflowFallback(ctx context.Context, opts ciFetchOptions, target ciTa
 		return ciResult{}, err
 	}
 	var runs []ghWorkflowRun
-	if err := json.Unmarshal(data, &runs); err != nil {
+	parseRegion := trace.StartRegion(ctx, "parse workflow runs json")
+	err = json.Unmarshal(data, &runs)
+	parseRegion.End()
+	if err != nil {
 		return ciResult{}, err
 	}
 	return summarizeWorkflowRuns(runs, target.Head), nil
 }
 
 func runGhJSON(ctx context.Context, workdir string, args ...string) ([]byte, error) {
+	name := "gh"
+	if len(args) > 0 && strings.TrimSpace(args[0]) != "" {
+		name = "gh " + strings.TrimSpace(args[0])
+	}
+	region := trace.StartRegion(ctx, name)
+	defer region.End()
+
 	cmd := exec.CommandContext(ctx, "gh", args...)
 	if workdir != "" {
 		cmd.Dir = workdir
@@ -327,10 +362,8 @@ func runGhJSON(ctx context.Context, workdir string, args ...string) ([]byte, err
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		if ctx != nil {
-			if ctxErr := ctx.Err(); ctxErr != nil {
-				return nil, ctxErr
-			}
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, ctxErr
 		}
 		msg := strings.TrimSpace(stderr.String())
 		if msg == "" {

@@ -758,7 +758,11 @@ func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus, w
 			if status == nil || status.HasError || status.Error != "" {
 				continue
 			}
-			prs, err := queryPullRequests(ctx, status.Path, status.Branch)
+			prs, err := func() ([]pullRequestInfo, error) {
+				region := trace.StartRegion(ctx, "pr "+status.Name)
+				defer region.End()
+				return queryPullRequests(ctx, status.Path, status.Branch)
+			}()
 			if errors.Is(err, context.Canceled) {
 				markPRInterrupted(statuses, onUpdate)
 				return err
@@ -804,7 +808,11 @@ func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus, w
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			prs, err := queryPullRequests(ctx, status.Path, status.Branch)
+			prs, err := func() ([]pullRequestInfo, error) {
+				region := trace.StartRegion(ctx, "pr "+status.Name)
+				defer region.End()
+				return queryPullRequests(ctx, status.Path, status.Branch)
+			}()
 			if errors.Is(err, context.Canceled) {
 				return
 			}

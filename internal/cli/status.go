@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"runtime/trace"
 	"sort"
 	"strconv"
 	"strings"
@@ -25,12 +26,15 @@ import (
 
 func runStatus(cmd *cobra.Command, args []string) error {
 	statusPreflight(cmd)
-	proj, err := loadProjectFromWD()
+	ctx := cmd.Context()
+	proj, err := withTraceRegion(ctx, "discover project", loadProjectFromWD)
 	if err != nil {
 		return err
 	}
 
-	worktrees, err := project.ListWorktrees(proj.Root)
+	worktrees, err := withTraceRegion(ctx, "list worktrees", func() ([]project.Worktree, error) {
+		return project.ListWorktrees(proj.Root)
+	})
 	if err != nil {
 		return err
 	}
@@ -71,7 +75,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(cmd.ErrOrStderr(), "status debug: tty=%t rows=%d\n", isTTY, len(statuses))
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	interruptCtx, stop := signal.NotifyContext(ctx, os.Interrupt)
 	defer stop()
 	var renderer *statusRenderer
 	if isTTY {
@@ -91,31 +95,39 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	workflow := workflowExpectationsForProject(compareCtx)
 	ciRepo, ciRepoErr := resolveGitHubRepo(proj)
 
-	for i, wt := range worktrees {
-		status, err := collectWorktreeStatus(proj, wt, compareCtx.CompareRef)
-		if err != nil {
-			msg := singleLineError(err)
-			if friendly, ok := friendlyWorktreeGitError(wt.Name, err); ok {
-				msg = friendly
+	{
+		region := trace.StartRegion(ctx, "collect git status")
+		defer region.End()
+
+		for i, wt := range worktrees {
+			status, werr := collectWorktreeStatus(proj, wt, compareCtx.CompareRef)
+			if werr != nil {
+				msg := singleLineError(werr)
+				if friendly, ok := friendlyWorktreeGitError(wt.Name, werr); ok {
+					msg = friendly
+				}
+				statuses[i] = &worktreeStatus{
+					Name:      wt.Name,
+					Path:      wt.Path,
+					Branch:    wt.Name,
+					Timestamp: now,
+					PRStatus:  fmt.Sprintf("error: %s", msg),
+					Error:     msg,
+					HasError:  true,
+					Current:   wt.Name == current,
+				}
+				continue
 			}
-			statuses[i] = &worktreeStatus{
-				Name:      wt.Name,
-				Path:      wt.Path,
-				Branch:    wt.Name,
-				Timestamp: now,
-				PRStatus:  fmt.Sprintf("error: %s", msg),
-				Error:     msg,
-				HasError:  true,
-				Current:   wt.Name == current,
-			}
-			continue
+			status.Current = wt.Name == current
+			status.PRStatus = prLoadingLabel
+			statuses[i] = status
 		}
-		status.Current = wt.Name == current
-		status.PRStatus = prLoadingLabel
-		statuses[i] = status
 	}
 
-	if err := attachProcessesToStatuses(statuses, worktrees); err != nil {
+	err = withTraceRegionErr(ctx, "collect processes", func() error {
+		return attachProcessesToStatuses(statuses, worktrees)
+	})
+	if err != nil {
 		return err
 	}
 
@@ -132,7 +144,9 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		renderer.Render(statuses, layout, now)
 	}
 
-	err = fetchPullRequestStatuses(ctx, statuses, workflow, rerender)
+	err = withTraceRegionErr(ctx, "fetch pull requests", func() error {
+		return fetchPullRequestStatuses(interruptCtx, statuses, workflow, rerender)
+	})
 	if err != nil && errors.Is(err, context.Canceled) {
 		fmt.Fprintln(cmd.ErrOrStderr(), "warning: cancelled GitHub fetch")
 	}
@@ -151,7 +165,10 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		RemoteName: proj.Config.CIRemote(),
 		Workdir:    proj.DefaultWorktreePath,
 	}
-	if err := fetchCIStatuses(ctx, ciOpts, statuses, now, rerender); err != nil && errors.Is(err, context.Canceled) {
+	err = withTraceRegionErr(ctx, "fetch ci status", func() error {
+		return fetchCIStatuses(interruptCtx, ciOpts, statuses, now, rerender)
+	})
+	if err != nil && errors.Is(err, context.Canceled) {
 		fmt.Fprintln(cmd.ErrOrStderr(), "warning: cancelled GitHub fetch")
 	}
 

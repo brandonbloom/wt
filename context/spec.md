@@ -17,6 +17,7 @@
 - A `.wt/` directory lives alongside the worktrees (e.g., `~/Projects/iaf/.wt`) and is **not** part of the git repo, allowing machine- or user-specific configuration.
 - All commands discover `.wt` (and therefore the project root) by walking upward from the current directory until `<dir>/.wt` is found. If no `.wt` directory exists before reaching the filesystem root, exit with an error directing the user to run `wt init`.
 - All commands accept `-C/--directory <dir>` to change the working directory before any discovery or git operations, matching `make`/`git`-style semantics. When provided multiple times, each `-C` is applied in order.
+- All commands accept `--trace <path>` to write a Go execution trace to a file for offline performance analysis (view with `go tool trace` or Perfetto). Relative paths resolve after applying any earlier `-C/--directory` flags.
 - When invoked from inside `main`/`master` or any other worktree under the project directory, `wt` must still function. The dashboard should show a detailed view for the current tree plus summary data for the others.
 
 ## Initialization (`wt init`)

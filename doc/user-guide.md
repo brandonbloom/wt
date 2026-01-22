@@ -35,6 +35,7 @@ Key rules:
 - `.wt/` sits beside every worktree and holds `config.toml`. The directory is not part of git so it can store machine-local settings.
 - Additional worktrees live alongside the default, each mapped to a git worktree and branch of the same name.
 - Commands discover the project root by walking up from the current directory until a `.wt/` directory is found, so you can run `wt` from any worktree. Missing `.wt/` directories trigger an error that instructs you to run `wt init`. Use `wt -C <dir> …` (or `--directory`) to point `wt` at a project while you’re currently somewhere else.
+- For performance debugging, pass `--trace <path>` to write a Go execution trace you can inspect with `go tool trace` or Perfetto (see “Execution Tracing” below).
 
 ## Initializing Repositories
 
@@ -198,6 +199,22 @@ All GitHub data flows through the `gh` CLI so `wt` relies on its auth and config
 - Each command validates prerequisites (layout, tooling, wrapper, naming) before mutating state.
 - Messages describe how to fix the issue (run `wt init`, install the wrapper, resolve naming collisions, etc.).
 - When a problem could have been detected by `wt doctor`, add or reference the relevant doctor check so it can be caught proactively.
+
+## Execution Tracing
+
+Every command accepts `--trace <path>` to write a Go execution trace for offline inspection.
+
+```bash
+wt --trace trace.out status
+go tool trace trace.out
+```
+
+You can also drag-and-drop `trace.out` into https://ui.perfetto.dev for a timeline view.
+
+Trace paths are applied in argv order with `-C/--directory`:
+
+- `wt --trace trace.out -C /path/to/project status` writes `./trace.out` relative to where you ran `wt`.
+- `wt -C /path/to/project --trace trace.out status` writes `/path/to/project/trace.out`.
 
 ## Testing & Transcripts
 

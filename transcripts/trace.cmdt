@@ -1,0 +1,8 @@
+$ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'set -euo pipefail; rm -f /tmp/wt-transcripts/trace.out; export WT_TEST_SERIAL_FETCH="1"; export WT_PROCESS_TEST_DATA="[]"; /tmp/wt-transcripts/bin/wt --trace /tmp/wt-transcripts/trace.out status >/dev/null; test -s /tmp/wt-transcripts/trace.out; echo traced; rm -f /tmp/wt-transcripts/trace.out'
+1 traced
+
+$ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'set -euo pipefail; rm -f trace.out; export WT_TEST_SERIAL_FETCH="1"; export WT_PROCESS_TEST_DATA="[]"; /tmp/wt-transcripts/bin/wt --trace trace.out -C /tmp/wt-transcripts/tmprepo/main status >/dev/null; test -s trace.out; echo traced-local; rm -f trace.out'
+1 traced-local
+
+$ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'set -euo pipefail; rm -f /tmp/wt-transcripts/tmprepo/main/trace.out; export WT_TEST_SERIAL_FETCH="1"; export WT_PROCESS_TEST_DATA="[]"; /tmp/wt-transcripts/bin/wt -C /tmp/wt-transcripts/tmprepo/main --trace trace.out status >/dev/null; test -s /tmp/wt-transcripts/tmprepo/main/trace.out; echo traced-after-chdir; rm -f /tmp/wt-transcripts/tmprepo/main/trace.out'
+1 traced-after-chdir

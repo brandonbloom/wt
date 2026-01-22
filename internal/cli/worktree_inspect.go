@@ -2,6 +2,9 @@ package cli
 
 import (
 	"context"
+	"errors"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/brandonbloom/wt/internal/gitutil"
@@ -52,28 +55,23 @@ var gatherWorktreeGitDataOptionsFull = gatherWorktreeGitDataOptions{
 func gatherWorktreeGitData(ctx context.Context, proj *project.Project, wt project.Worktree, defaultCompareRef string, opts gatherWorktreeGitDataOptions) (*worktreeGitData, error) {
 	data := &worktreeGitData{Worktree: wt}
 
-	branch, err := withTraceRegion(ctx, "git current branch", func() (string, error) {
-		return gitutil.CurrentBranch(wt.Path)
+	status, err := withTraceRegion(ctx, "git status", func() (gitutil.StatusSummary, error) {
+		return gitutil.Status(wt.Path)
 	})
 	if err != nil {
 		return nil, err
 	}
-	data.Branch = branch
+	data.Branch = status.Head
+	data.HeadHash = status.HeadOID
 
-	dirty, err := withTraceRegion(ctx, "git dirty", func() (bool, error) {
-		return gitutil.Dirty(wt.Path)
-	})
-	if err != nil {
-		return nil, err
-	}
-	data.Dirty = dirty
+	data.Dirty = status.HasChanges
 
-	if branch != "" {
+	if data.Branch != "" {
 		stash, err := withTraceRegion(ctx, "git stash", func() (bool, error) {
 			if opts.StashBranches != nil {
-				return opts.StashBranches[branch], nil
+				return opts.StashBranches[data.Branch], nil
 			}
-			return gitutil.HasBranchStash(wt.Path, branch)
+			return gitutil.HasBranchStash(wt.Path, data.Branch)
 		})
 		if err != nil {
 			return nil, err
@@ -86,25 +84,8 @@ func gatherWorktreeGitData(ctx context.Context, proj *project.Project, wt projec
 	})
 	data.Operation = operation
 
-	ahead, behind, err := func() (int, int, error) {
-		type aheadBehind struct {
-			ahead  int
-			behind int
-		}
-		out, err := withTraceRegion(ctx, "git ahead/behind upstream", func() (aheadBehind, error) {
-			ahead, behind, err := gitutil.AheadBehind(wt.Path, branch)
-			return aheadBehind{ahead: ahead, behind: behind}, err
-		})
-		return out.ahead, out.behind, err
-	}()
-	if err != nil {
-		if operation == "" && !isDetachedHeadError(err) {
-			return nil, err
-		}
-		ahead, behind = 0, 0
-	}
-	data.Ahead = ahead
-	data.Behind = behind
+	data.Ahead = status.Ahead
+	data.Behind = status.Behind
 
 	ts, err := withTraceRegion(ctx, "git head timestamp", func() (time.Time, error) {
 		return gitutil.HeadTimestamp(wt.Path)
@@ -112,9 +93,9 @@ func gatherWorktreeGitData(ctx context.Context, proj *project.Project, wt projec
 	if err != nil {
 		return nil, err
 	}
-	if dirty {
-		dirtyTS, derr := withTraceRegion(ctx, "git latest dirty timestamp", func() (time.Time, error) {
-			return gitutil.LatestDirtyTimestamp(wt.Path)
+	if data.Dirty {
+		dirtyTS, derr := withTraceRegion(ctx, "dirty mtime", func() (time.Time, error) {
+			return latestMTime(wt.Path, status.Paths)
 		})
 		if derr == nil {
 			ts = dirtyTS
@@ -138,14 +119,6 @@ func gatherWorktreeGitData(ctx context.Context, proj *project.Project, wt projec
 	}
 	data.BaseAhead = baseAhead
 	data.BaseBehind = baseBehind
-
-	headHash, err := withTraceRegion(ctx, "git head hash", func() (string, error) {
-		return gitutil.Run(wt.Path, "rev-parse", "HEAD")
-	})
-	if err != nil {
-		return nil, err
-	}
-	data.HeadHash = headHash
 
 	compareRef := defaultCompareRef
 	if compareRef == "" {
@@ -189,7 +162,7 @@ func gatherWorktreeGitData(ctx context.Context, proj *project.Project, wt projec
 				exists bool
 			}
 			out, err := withTraceRegion(ctx, "git remote branch head", func() (remoteBranch, error) {
-				hash, exists, err := gitutil.RemoteBranchHead(proj.DefaultWorktreePath, "origin", branch)
+				hash, exists, err := gitutil.RemoteBranchHead(proj.DefaultWorktreePath, "origin", data.Branch)
 				return remoteBranch{hash: hash, exists: exists}, err
 			})
 			return out.hash, out.exists, err
@@ -199,9 +172,35 @@ func gatherWorktreeGitData(ctx context.Context, proj *project.Project, wt projec
 		}
 		data.HasRemoteBranch = exists
 		if exists {
-			data.RemoteMatchesHead = remoteHash == headHash
+			data.RemoteMatchesHead = remoteHash == data.HeadHash
 		}
 	}
 
 	return data, nil
+}
+
+func latestMTime(dir string, paths []string) (time.Time, error) {
+	if dir == "" {
+		return time.Time{}, errors.New("empty dir")
+	}
+	if len(paths) == 0 {
+		return time.Time{}, errors.New("no paths")
+	}
+	var newest time.Time
+	for _, path := range paths {
+		if path == "" {
+			continue
+		}
+		info, err := os.Stat(filepath.Join(dir, path))
+		if err != nil {
+			continue
+		}
+		if info.ModTime().After(newest) {
+			newest = info.ModTime()
+		}
+	}
+	if newest.IsZero() {
+		return time.Time{}, errors.New("unable to stat paths")
+	}
+	return newest, nil
 }

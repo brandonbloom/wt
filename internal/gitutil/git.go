@@ -120,22 +120,93 @@ func ParseGitHubRemote(raw string) (string, string, error) {
 	return owner, repo, nil
 }
 
+type StatusSummary struct {
+	Head       string
+	HeadOID    string
+	Ahead      int
+	Behind     int
+	HasAB      bool
+	Paths      []string
+	HasChanges bool
+}
+
+func Status(dir string) (StatusSummary, error) {
+	out, err := Run(dir, "status", "--porcelain=2", "--branch", "-z")
+	if err != nil {
+		return StatusSummary{}, err
+	}
+	if out == "" {
+		return StatusSummary{}, nil
+	}
+
+	var status StatusSummary
+	parts := strings.Split(out, "\x00")
+	for i := 0; i < len(parts); i++ {
+		rec := parts[i]
+		if rec == "" {
+			continue
+		}
+		if strings.HasPrefix(rec, "# ") {
+			switch {
+			case strings.HasPrefix(rec, "# branch.head "):
+				status.Head = strings.TrimSpace(strings.TrimPrefix(rec, "# branch.head "))
+			case strings.HasPrefix(rec, "# branch.oid "):
+				status.HeadOID = strings.TrimSpace(strings.TrimPrefix(rec, "# branch.oid "))
+			case strings.HasPrefix(rec, "# branch.ab "):
+				var plus, minus int
+				_, scanErr := fmt.Sscanf(rec, "# branch.ab +%d -%d", &plus, &minus)
+				if scanErr == nil {
+					status.Ahead = plus
+					status.Behind = minus
+					status.HasAB = true
+				}
+			}
+			continue
+		}
+
+		switch rec[0] {
+		case '1', '2', 'u':
+			fields := strings.Fields(rec)
+			if len(fields) > 0 {
+				status.Paths = append(status.Paths, fields[len(fields)-1])
+				status.HasChanges = true
+			}
+			if rec[0] == '2' && i+1 < len(parts) {
+				// For renames, porcelain v2 encodes the original path as a separate NUL-delimited record.
+				i++
+			}
+		case '?':
+			path := strings.TrimSpace(strings.TrimPrefix(rec, "?"))
+			if path != "" {
+				status.Paths = append(status.Paths, path)
+				status.HasChanges = true
+			}
+		}
+	}
+
+	if status.Head == "(detached)" {
+		status.Head = "HEAD"
+	}
+
+	return status, nil
+}
+
 // CurrentBranch reports the checked-out branch name for a worktree.
 func CurrentBranch(dir string) (string, error) {
-	out, err := Run(dir, "rev-parse", "--abbrev-ref", "HEAD")
+	status, err := Status(dir)
 	if err != nil {
 		return "", err
 	}
-	return out, nil
+	return status.Head, nil
 }
 
 // Dirty reports whether the worktree has uncommitted/staged changes.
 func Dirty(dir string) (bool, error) {
-	out, err := Run(dir, "status", "--porcelain")
+	status, err := Status(dir)
 	if err != nil {
 		return false, err
 	}
-	return strings.TrimSpace(out) != "", nil
+	return status.HasChanges, nil
 }
 
 // HasBranchStash reports whether any stash entries mention the given branch.
@@ -244,42 +315,6 @@ func HeadTimestamp(dir string) (time.Time, error) {
 	return t, nil
 }
 
-// LatestDirtyTimestamp approximates the newest mtime of files mentioned by git status.
-func LatestDirtyTimestamp(dir string) (time.Time, error) {
-	out, err := Run(dir, "status", "--porcelain", "-z")
-	if err != nil {
-		return time.Time{}, err
-	}
-	if out == "" {
-		return time.Time{}, errors.New("worktree is clean")
-	}
-	var newest time.Time
-	entries := strings.Split(out, "\x00")
-	for _, entry := range entries {
-		if entry == "" {
-			continue
-		}
-		if len(entry) < 4 {
-			continue
-		}
-		path := strings.TrimSpace(entry[3:])
-		if path == "" {
-			continue
-		}
-		info, err := os.Stat(filepath.Join(dir, path))
-		if err != nil {
-			continue
-		}
-		if info.ModTime().After(newest) {
-			newest = info.ModTime()
-		}
-	}
-	if newest.IsZero() {
-		return time.Time{}, errors.New("unable to find dirty files")
-	}
-	return newest, nil
-}
-
 // HeadMergedInto reports whether HEAD is already an ancestor of the given ref.
 func HeadMergedInto(dir, ref string) (bool, error) {
 	if ref == "" {
@@ -375,20 +410,12 @@ func gitRefExists(dir, ref string) bool {
 }
 
 func aheadBehindFromStatus(dir string) (ahead, behind int, ok bool, err error) {
-	out, err := Run(dir, "status", "--porcelain=2", "--branch")
+	status, err := Status(dir)
 	if err != nil {
 		return 0, 0, false, err
 	}
-	for _, line := range strings.Split(out, "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "# branch.ab") {
-			var plus, minus int
-			_, scanErr := fmt.Sscanf(line, "# branch.ab +%d -%d", &plus, &minus)
-			if scanErr != nil {
-				return 0, 0, false, scanErr
-			}
-			return plus, minus, true, nil
-		}
+	if status.HasAB {
+		return status.Ahead, status.Behind, true, nil
 	}
 	return 0, 0, false, nil
 }

@@ -317,7 +317,7 @@ func inspectWorktreeBase(ctx context.Context, proj *project.Project, wt project.
 		defaultBranch: proj.Config.DefaultBranch,
 	}
 
-	data, err := gatherWorktreeGitData(proj, wt, defaultCompareRef)
+	data, err := gatherWorktreeGitData(ctx, proj, wt, defaultCompareRef)
 	if err != nil {
 		cand.Branch = "(unknown)"
 		return markTidyGitError(cand, err)

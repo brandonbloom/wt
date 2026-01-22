@@ -91,16 +91,28 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	compareCtx := defaultBranchComparisonContext(proj)
+	compareCtx := func() defaultBranchCompareContext {
+		region := trace.StartRegion(ctx, "resolve default compare ref")
+		defer region.End()
+		return defaultBranchComparisonContext(proj)
+	}()
 	workflow := workflowExpectationsForProject(compareCtx)
-	ciRepo, ciRepoErr := resolveGitHubRepo(proj)
+	ciRepo, ciRepoErr := func() (*githubRepo, error) {
+		region := trace.StartRegion(ctx, "resolve github repo")
+		defer region.End()
+		return resolveGitHubRepo(proj)
+	}()
 
 	{
 		region := trace.StartRegion(ctx, "collect git status")
 		defer region.End()
 
 		for i, wt := range worktrees {
-			status, werr := collectWorktreeStatus(proj, wt, compareCtx.CompareRef)
+			status, werr := func() (*worktreeStatus, error) {
+				wtRegion := trace.StartRegion(ctx, "worktree "+wt.Name)
+				defer wtRegion.End()
+				return collectWorktreeStatus(ctx, proj, wt, compareCtx.CompareRef)
+			}()
 			if werr != nil {
 				msg := singleLineError(werr)
 				if friendly, ok := friendlyWorktreeGitError(wt.Name, werr); ok {
@@ -208,8 +220,8 @@ type worktreeStatus struct {
 	CIDetail       []ciRunSummary
 }
 
-func collectWorktreeStatus(proj *project.Project, wt project.Worktree, defaultCompareRef string) (*worktreeStatus, error) {
-	data, err := gatherWorktreeGitData(proj, wt, defaultCompareRef)
+func collectWorktreeStatus(ctx context.Context, proj *project.Project, wt project.Worktree, defaultCompareRef string) (*worktreeStatus, error) {
+	data, err := gatherWorktreeGitData(ctx, proj, wt, defaultCompareRef)
 	if err != nil {
 		return nil, err
 	}

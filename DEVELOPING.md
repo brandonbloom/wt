@@ -11,7 +11,7 @@
 ## Building & Testing
 
 ```bash
-mise run build        # go build -o bin/ ./cmd/wt with repo-local caches
+mise run build        # go build -o bin/wt . (plus internal tooling) with repo-local caches
 mise run test         # go test ./... && transcript check transcripts/*.cmdt
 ```
 
@@ -32,12 +32,12 @@ The resulting `trace.out` can also be loaded directly into Perfetto (https://ui.
 
 ## Transcript Harness
 
-`transcripts/entrypoint.sh` provisions a throwaway repo, runs `wt init`, stubs `gh`,
-and can simulate the wrapper (`--activate-wrapper`) plus `cd` into a worktree
+`wtcmdtest` provisions a throwaway repo, runs `wt init`, stubs `gh`, and can
+simulate the wrapper (`--activate-wrapper`) plus `cd` into a worktree
 (`--worktree <dir>`). Use it inside `.cmdt` files to avoid repeating setup:
 
 ```bash
-$ ./transcripts/entrypoint.sh --activate-wrapper --worktree main ../../bin/wt doctor
+$ wtcmdtest --activate-wrapper --worktree main ../../bin/wt doctor
 healthy!
 ```
 

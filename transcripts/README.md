@@ -22,11 +22,11 @@ The `context/transcript.md` guide in this repository dives deeper into the forma
 
 ## Test Harness
 
-`transcripts/entrypoint.sh` bootstraps a disposable wt project, stubs `gh` (with canned responses so tests stay deterministic/offline), and
+`wtcmdtest` bootstraps a disposable wt project, stubs `gh` (with canned responses so tests stay deterministic/offline), and
 optionally simulates the shell wrapper. Use it inside transcripts to avoid
 duplicating setup/teardown boilerplate:
 
 ```bash
-$ ./transcripts/entrypoint.sh --activate-wrapper --worktree main ../../bin/wt doctor
+$ wtcmdtest --activate-wrapper --worktree main ../../bin/wt doctor
 healthy!
 ```

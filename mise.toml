@@ -9,10 +9,15 @@ go = "latest"
 "go:github.com/deref/transcript" = "latest"
 
 [tasks.build]
-run = "go build -o bin/ ./cmd/wt "
+run = "go build -o bin/ . ./internal/wtcmdtest ./internal/wtghstub"
 
 [tasks.test]
+run = "mise run --timeout 30s --raw test_impl"
+
+[tasks.test_impl]
+depends = ["build"]
+env = { WT_CMDTEST_TIMEOUT = "10s" }
 run = """
-go test ./...
+go test -timeout=10s ./internal/wtcmdtest
 transcript check transcripts/*.cmdt
 """

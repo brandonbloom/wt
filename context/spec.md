@@ -63,7 +63,7 @@
 - Because a binary cannot directly change the caller’s `cwd`, the installed Go binary is named `wt` and emits shell code that defines a shell wrapper function (also named `wt`) which shadows the binary on `$PATH`.
 - Commands that need to `cd` (e.g., `wt new`) should fail politely when the wrapper is missing, but `wt`/`wt status` must proactively detect an inactive wrapper and emit installation guidance before rendering the dashboard.
 - `wt activate` is responsible for emitting the shell script that installs/updates the wrapper function. Users add `eval "$(wt activate)"` to their shell rc (zsh assumed, but solution should be shell-agnostic where possible).
-- Installation flow: `go install github.com/brandonbloom/wt/cmd/wt@latest`, then add the eval line to shell config.
+- Installation flow: `go install github.com/brandonbloom/wt@latest`, then add the eval line to shell config.
 - Goal: allow commands like `wt new` to create a worktree and automatically `cd` into it through the evaluated shell function.
 
 ## Status Dashboard (`wt`)

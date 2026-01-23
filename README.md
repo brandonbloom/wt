@@ -15,7 +15,7 @@ If you're not me, you probably don't want to use this.
 
 ```bash
 # Install or upgrade.
-go install github.com/brandonbloom/wt/cmd/wt@latest
+go install github.com/brandonbloom/wt@latest
 
 # Confirm the installed version.
 wt version

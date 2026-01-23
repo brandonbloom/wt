@@ -6,7 +6,7 @@ This guide describes how to install `wt`, prepare a repository for worktrees, an
 
 1. Install or update the binary:
    ```bash
-   go install github.com/brandonbloom/wt/cmd/wt@latest
+   go install github.com/brandonbloom/wt@latest
    ```
 2. Confirm the installed version:
    ```bash

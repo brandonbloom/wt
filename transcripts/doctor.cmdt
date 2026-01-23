@@ -1,2 +1,2 @@
-$ ./transcripts/entrypoint.sh --activate-wrapper --worktree main ../../bin/wt doctor
+$ wtcmdtest --activate-wrapper --worktree main ../../bin/wt doctor
 1 healthy!

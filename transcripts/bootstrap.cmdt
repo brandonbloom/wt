@@ -1,20 +1,20 @@
-$ ./transcripts/entrypoint.sh --worktree main bash -lc 'export SHELL=/bin/bash && ../../bin/wt bootstrap'
+$ wtcmdtest --worktree main bash -lc 'export SHELL=/bin/bash && ../../bin/wt bootstrap'
 1 No bootstrap command configured; edit .wt/config.toml to set [bootstrap].run.
-$ ./transcripts/entrypoint.sh --worktree main bash -lc 'python3 -c "from pathlib import Path; Path(\"../.wt/config.toml\").write_text(\"default_branch = \\\"main\\\"\\n\\n[bootstrap]\\nrun = \\\"echo start; false; echo done\\\"\\n\")" && export SHELL=/bin/bash && ../../bin/wt bootstrap || true'
+$ wtcmdtest --worktree main bash -lc 'python3 -c "from pathlib import Path; Path(\"../.wt/config.toml\").write_text(\"default_branch = \\\"main\\\"\\n\\n[bootstrap]\\nrun = \\\"echo start; false; echo done\\\"\\n\")" && export SHELL=/bin/bash && ../../bin/wt bootstrap || true'
 2 bootstrap failed: exit status 1
 1 start
-$ ./transcripts/entrypoint.sh --worktree main bash -lc 'python3 -c "from pathlib import Path; Path(\"../.wt/config.toml\").write_text(\"default_branch = \\\"main\\\"\\n\\n[bootstrap]\\nrun = \\\"echo start; false; echo done\\\"\\n\")" && export SHELL=/bin/bash && ../../bin/wt bootstrap --no-strict'
+$ wtcmdtest --worktree main bash -lc 'python3 -c "from pathlib import Path; Path(\"../.wt/config.toml\").write_text(\"default_branch = \\\"main\\\"\\n\\n[bootstrap]\\nrun = \\\"echo start; false; echo done\\\"\\n\")" && export SHELL=/bin/bash && ../../bin/wt bootstrap --no-strict'
 1 start
 1 done
-$ ./transcripts/entrypoint.sh --worktree main bash -lc 'python3 -c "from pathlib import Path; Path(\"../.wt/config.toml\").write_text(\"default_branch = \\\"main\\\"\\n\\n[bootstrap]\\nrun = \\\"echo start; false; echo done\\\"\\n\")" && export SHELL=/bin/bash && ../../bin/wt bootstrap --no-strict -x'
+$ wtcmdtest --worktree main bash -lc 'python3 -c "from pathlib import Path; Path(\"../.wt/config.toml\").write_text(\"default_branch = \\\"main\\\"\\n\\n[bootstrap]\\nrun = \\\"echo start; false; echo done\\\"\\n\")" && export SHELL=/bin/bash && ../../bin/wt bootstrap --no-strict -x'
 2 + echo start
 2 + false
 2 + echo done
 1 start
 1 done
-$ ./transcripts/entrypoint.sh --worktree main bash -lc 'python3 -c "from pathlib import Path; Path(\"../.wt/config.toml\").write_text(\"default_branch = \\\"main\\\"\\n\\n[bootstrap]\\nrun = \\\"echo start; false; echo done\\\"\\nstrict = false\\n\")" && export SHELL=/bin/bash && ../../bin/wt bootstrap'
+$ wtcmdtest --worktree main bash -lc 'python3 -c "from pathlib import Path; Path(\"../.wt/config.toml\").write_text(\"default_branch = \\\"main\\\"\\n\\n[bootstrap]\\nrun = \\\"echo start; false; echo done\\\"\\nstrict = false\\n\")" && export SHELL=/bin/bash && ../../bin/wt bootstrap'
 1 start
 1 done
-$ ./transcripts/entrypoint.sh --worktree main bash -lc 'python3 -c "from pathlib import Path; Path(\"../.wt/config.toml\").write_text(\"default_branch = \\\"main\\\"\\n\\n[bootstrap]\\nrun = \\\"echo start; false; echo done\\\"\\nstrict = false\\n\")" && export SHELL=/bin/bash && ../../bin/wt bootstrap --strict || true'
+$ wtcmdtest --worktree main bash -lc 'python3 -c "from pathlib import Path; Path(\"../.wt/config.toml\").write_text(\"default_branch = \\\"main\\\"\\n\\n[bootstrap]\\nrun = \\\"echo start; false; echo done\\\"\\nstrict = false\\n\")" && export SHELL=/bin/bash && ../../bin/wt bootstrap --strict || true'
 2 bootstrap failed: exit status 1
 1 start

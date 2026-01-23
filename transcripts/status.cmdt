@@ -1,12 +1,12 @@
-$ ./transcripts/entrypoint.sh bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && printf '"'"'[{"pid":9001,"command":"codex","cwd":"%s"}]\n'"'"' "$(pwd)" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && ../../bin/wt'
+$ wtcmdtest bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && printf '"'"'[{"pid":9001,"command":"codex","cwd":"%s"}]\n'"'"' "$(pwd)" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && ../../bin/wt'
 2 warning: shell wrapper missing; add `eval "$(wt activate)"` to your shell rc
 1 * main  dirty              just now           CI✓ · codex (9001)                                                              
 
-$ ./transcripts/entrypoint.sh bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && printf '"'"'[{"pid":9001,"command":"codex","cwd":"%s"}]\n'"'"' "$(pwd)" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && ../../bin/wt status'
+$ wtcmdtest bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && printf '"'"'[{"pid":9001,"command":"codex","cwd":"%s"}]\n'"'"' "$(pwd)" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && ../../bin/wt status'
 2 warning: shell wrapper missing; add `eval "$(wt activate)"` to your shell rc
 1 * main  dirty              just now           CI✓ · codex (9001)                                                              
 
-$ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new demo-branch --base main >/dev/null 2>&1 && cd ../demo-branch && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && printf '"'"'[{"pid":9101,"command":"server","cwd":"%s"},{"pid":9202,"command":"editor","cwd":"%s"}]\n'"'"' "$(pwd)" "$(pwd)/../main" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && ../../bin/wt'
+$ wtcmdtest --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new demo-branch --base main >/dev/null 2>&1 && cd ../demo-branch && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && printf '"'"'[{"pid":9101,"command":"server","cwd":"%s"},{"pid":9202,"command":"editor","cwd":"%s"}]\n'"'"' "$(pwd)" "$(pwd)/../main" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && ../../bin/wt'
 1 * demo-branch  dirty       just now           PR #42 open · CI✗ Pull Request Checks (1s ago) · server (9101)                  
 1   main                     2 days ago         CI✓ · editor (9202)                                                             
 1
@@ -15,11 +15,11 @@ $ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PAT
 1   started 1 min ago · completed 1s ago
 1   https://example.com/run/pr-42
 
-$ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new merged-branch --base main >/dev/null 2>&1 && cd ../merged-branch && echo merged >>README.md && git add README.md && git commit -m "merged work" >/dev/null && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && printf '"'"'[{"pid":9303,"command":"deploy","cwd":"%s"}]\n'"'"' "$(pwd)" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && ../../bin/wt'
+$ wtcmdtest --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new merged-branch --base main >/dev/null 2>&1 && cd ../merged-branch && echo merged >>README.md && git add README.md && git commit -m "merged work" >/dev/null && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && printf '"'"'[{"pid":9303,"command":"deploy","cwd":"%s"}]\n'"'"' "$(pwd)" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && ../../bin/wt'
 1 * merged-branch  dirty     just now           PR #99 merged; unpublished commits · CI✓ · deploy (9303)                        
 1   main                     2 days ago         CI✓                                                                             
 
-$ ./transcripts/entrypoint.sh bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && export WT_TEST_SERIAL_FETCH="1" && export WT_TEST_STATUS_PAUSE_AFTER_PR="50ms" && printf '"'"'[{"pid":9141,"ppid":8000,"command":"hexdump","cwd":"%s"},{"pid":9142,"ppid":9141,"command":"script","cwd":"%s"},{"pid":9143,"ppid":9000,"command":"zsh","cwd":"%s"},{"pid":9144,"ppid":9143,"command":"zsh","cwd":"%s"}]\n'"'"' "$(pwd)" "$(pwd)" "$(pwd)" "$(pwd)" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && script -q /dev/null ../../bin/wt | hexdump -C'
+$ wtcmdtest bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && export WT_TEST_SERIAL_FETCH="1" && export WT_TEST_STATUS_PAUSE_AFTER_PR="50ms" && printf '"'"'[{"pid":9141,"ppid":8000,"command":"hexdump","cwd":"%s"},{"pid":9142,"ppid":9141,"command":"script","cwd":"%s"},{"pid":9143,"ppid":9000,"command":"zsh","cwd":"%s"},{"pid":9144,"ppid":9143,"command":"zsh","cwd":"%s"}]\n'"'"' "$(pwd)" "$(pwd)" "$(pwd)" "$(pwd)" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && script -q /dev/null ../../bin/wt | hexdump -C'
 1 00000000  5e 44 08 08 77 61 72 6e  69 6e 67 3a 20 73 68 65  |^D..warning: she|
 1 00000010  6c 6c 20 77 72 61 70 70  65 72 20 6d 69 73 73 69  |ll wrapper missi|
 1 00000020  6e 67 3b 20 61 64 64 20  60 65 76 61 6c 20 22 24  |ng; add `eval "$|
@@ -49,7 +49,7 @@ $ ./transcripts/entrypoint.sh bash -lc 'cd main && export PATH="$(pwd)/../bin:$P
 1 000001a0  75 6d 70 20 28 39 31 34  31 29 2c 20 73 63 72 69  |ump (9141), scri|
 1 000001b0  70 74 20 28 39 31 34 e2  80 a6 0d 0a              |pt (914.....|
 1 000001bc
-$ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new demo-branch --base main >/dev/null 2>&1 && cd ../demo-branch && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && export WT_TEST_SERIAL_FETCH="1" && export WT_TEST_STATUS_PAUSE_AFTER_PR="50ms" && printf '"'"'[{"pid":9151,"ppid":8300,"command":"demo","cwd":"%s"},{"pid":9152,"ppid":9151,"command":"hexdump","cwd":"%s"},{"pid":9153,"ppid":9151,"command":"script","cwd":"%s"},{"pid":9154,"ppid":8400,"command":"zsh","cwd":"%s"},{"pid":9155,"ppid":8500,"command":"main-wt","cwd":"%s"}]\n'"'"' "$(pwd)" "$(pwd)" "$(pwd)" "$(pwd)" "$(pwd)/../main" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && script -q /dev/null ../../bin/wt | hexdump -C'
+$ wtcmdtest --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new demo-branch --base main >/dev/null 2>&1 && cd ../demo-branch && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-03T00:00:00Z" && export WT_TEST_SERIAL_FETCH="1" && export WT_TEST_STATUS_PAUSE_AFTER_PR="50ms" && printf '"'"'[{"pid":9151,"ppid":8300,"command":"demo","cwd":"%s"},{"pid":9152,"ppid":9151,"command":"hexdump","cwd":"%s"},{"pid":9153,"ppid":9151,"command":"script","cwd":"%s"},{"pid":9154,"ppid":8400,"command":"zsh","cwd":"%s"},{"pid":9155,"ppid":8500,"command":"main-wt","cwd":"%s"}]\n'"'"' "$(pwd)" "$(pwd)" "$(pwd)" "$(pwd)" "$(pwd)/../main" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && script -q /dev/null ../../bin/wt | hexdump -C'
 1 00000000  5e 44 08 08 2a 20 64 65  6d 6f 2d 62 72 61 6e 63  |^D..* demo-branc|
 1 00000010  68 20 20 20 20 20 20 20  20 20 20 20 20 20 20 2d  |h              -|
 1 00000020  20 20 20 20 20 20 20 20  20 20 20 20 20 20 20 20  |                |
@@ -127,6 +127,6 @@ $ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PAT
 1 000004a0  72 2d 34 32 0d 0a                                 |r-42..|
 1 000004a6
 
-$ ./transcripts/entrypoint.sh --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new solo-branch --base main >/dev/null 2>&1 && cd ../solo-branch && echo solo >>README.md && git add README.md && git commit -m "solo change" >/dev/null && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-04T00:00:00Z" && printf '"'"'[{"pid":9404,"command":"solo","cwd":"%s"}]\n'"'"' "$(pwd)" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && ../../bin/wt'
+$ wtcmdtest --activate-wrapper bash -lc 'cd main && export PATH="$(pwd)/../bin:$PATH" && ../../bin/wt new solo-branch --base main >/dev/null 2>&1 && cd ../solo-branch && echo solo >>README.md && git add README.md && git commit -m "solo change" >/dev/null && export PATH="$(pwd)/../bin:$PATH" && export WT_NOW="2000-01-04T00:00:00Z" && printf '"'"'[{"pid":9404,"command":"solo","cwd":"%s"}]\n'"'"' "$(pwd)" >processes.json && export WT_PROCESS_TEST_DATA_FILE="$(pwd)/processes.json" && ../../bin/wt'
 1 * solo-branch  dirty       just now           CI✓ · solo (9404)                                                               
 1   main                     3 days ago         CI✓                                                                             

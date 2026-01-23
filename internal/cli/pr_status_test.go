@@ -51,7 +51,7 @@ func TestFetchPullRequestStatuses_SkipsStatusesWithErrors(t *testing.T) {
 		},
 	}
 
-	if err := fetchPullRequestStatuses(context.Background(), statuses, workflowExpectations{PRsExpected: true}, nil); err != nil {
+	if err := fetchPullRequestStatuses(context.Background(), nil, nil, statuses, workflowExpectations{PRsExpected: true}, nil); err != nil {
 		t.Fatalf("fetchPullRequestStatuses returned error: %v", err)
 	}
 	if got := statuses[0].PRStatus; got != "error: git failed" {

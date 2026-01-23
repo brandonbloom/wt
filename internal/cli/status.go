@@ -202,7 +202,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	err = withTraceRegionErr(ctx, "fetch pull requests", func() error {
-		return fetchPullRequestStatuses(interruptCtx, statuses, workflow, rerender)
+		return fetchPullRequestStatuses(interruptCtx, ciRepo, ciRepoErr, statuses, workflow, rerender)
 	})
 	if err != nil && errors.Is(err, context.Canceled) {
 		fmt.Fprintln(cmd.ErrOrStderr(), "warning: cancelled GitHub fetch")
@@ -772,7 +772,7 @@ func formatStatusLines(statuses []*worktreeStatus, now time.Time, layout columnL
 	return lines
 }
 
-func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus, workflow workflowExpectations, onUpdate func(*worktreeStatus)) error {
+func fetchPullRequestStatuses(ctx context.Context, repo *githubRepo, repoErr error, statuses []*worktreeStatus, workflow workflowExpectations, onUpdate func(*worktreeStatus)) error {
 	if len(statuses) == 0 {
 		return nil
 	}
@@ -815,6 +815,63 @@ func fetchPullRequestStatuses(ctx context.Context, statuses []*worktreeStatus, w
 			}
 		}
 		return combined
+	}
+
+	if repo != nil && repoErr == nil {
+		need := make([]*worktreeStatus, 0, len(statuses))
+		byBranch := make(map[string][]*worktreeStatus)
+		branches := make([]string, 0, len(statuses))
+		for _, status := range statuses {
+			if status == nil || status.HasError || status.Error != "" {
+				continue
+			}
+			if !status.HasPendingWork {
+				status.PRStatus = ""
+				if onUpdate != nil {
+					onUpdate(status)
+				}
+				continue
+			}
+			need = append(need, status)
+			branch := strings.TrimSpace(status.Branch)
+			byBranch[branch] = append(byBranch[branch], status)
+		}
+		for branch := range byBranch {
+			branches = append(branches, branch)
+		}
+
+		prsByBranch, err := queryPullRequestsGraphQL(ctx, "", repo, branches)
+		if errors.Is(err, context.Canceled) {
+			markPRInterrupted(statuses, onUpdate)
+			return err
+		}
+		if err != nil {
+			msg := singleLineError(err)
+			if msg == "" {
+				msg = "error"
+			}
+			for _, status := range need {
+				status.PRStatus = fmt.Sprintf("PR: unavailable (%s)", msg)
+				if onUpdate != nil {
+					onUpdate(status)
+				}
+			}
+			return err
+		}
+
+		for _, status := range need {
+			prs := prsByBranch[strings.TrimSpace(status.Branch)]
+			status.PullRequests = append([]pullRequestInfo(nil), prs...)
+			summary := summarizePullRequestState(prContext{
+				HasPendingWork:   status.HasPendingWork,
+				HasUniqueCommits: status.UniqueAhead > 0,
+			}, prs, workflow)
+			status.PRStatus = summary.Column
+			if onUpdate != nil {
+				onUpdate(status)
+			}
+		}
+		return nil
 	}
 
 	type prResult struct {

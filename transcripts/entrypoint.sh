@@ -284,6 +284,68 @@ case "$sub" in
     shift
     base="${endpoint%%\?*}"
     case "$base" in
+      graphql)
+        tmp="$(mktemp "${STATE_FILE}.graphql.XXXXXX")"
+        while [ $# -gt 0 ]; do
+          case "$1" in
+            -f|-F)
+              kv="${2:-}"
+              shift 2
+              key="${kv%%=*}"
+              val="${kv#*=}"
+              case "$key" in
+                b[0-9]*)
+                  idx="${key#b}"
+                  echo "${idx}|${val}" >>"$tmp"
+                  ;;
+              esac
+              ;;
+            *)
+              shift
+              ;;
+          esac
+        done
+
+        echo '{"data":{"repository":{'
+        first_alias=1
+        if [ -f "$tmp" ]; then
+          sort -t'|' -k1,1n "$tmp" | while IFS='|' read -r idx branch; do
+            [ -z "$idx" ] && continue
+            alias="pr${idx}"
+            if [ "$first_alias" -eq 0 ]; then
+              printf ','
+            fi
+            first_alias=0
+            printf '"%s":{"nodes":[' "$alias"
+
+            first_node=1
+            count=0
+            if [ -f "$STATE_FILE" ]; then
+              while IFS='|' read -r pr_branch pr_number pr_state pr_draft pr_updated pr_url; do
+                [ -z "$pr_branch" ] && continue
+                if [ "$pr_branch" != "$branch" ]; then
+                  continue
+                fi
+                count=$((count + 1))
+                if [ "$count" -gt 5 ]; then
+                  break
+                fi
+                if [ "$first_node" -eq 0 ]; then
+                  printf ','
+                fi
+                first_node=0
+                printf '{"number":%s,"state":"%s","isDraft":%s,"updatedAt":"%s","url":"%s","headRefName":"%s"}' \
+                  "$pr_number" "$pr_state" "$pr_draft" "$pr_updated" "$pr_url" "$pr_branch"
+              done <"$STATE_FILE"
+            fi
+
+            printf ']}'
+          done
+        fi
+        echo '}}}'
+        rm -f "$tmp"
+        exit 0
+        ;;
       repos/*/*/commits/*/check-runs)
         ref_with_tail="${base#repos/}"
         ref_with_tail="${ref_with_tail#*/}"

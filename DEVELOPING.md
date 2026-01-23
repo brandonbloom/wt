@@ -12,7 +12,8 @@
 
 ```bash
 mise run build        # go build -o bin/wt . (plus internal tooling) with repo-local caches
-mise run test         # go test ./... && transcript check transcripts/*.cmdt
+mise run test         # go test ./... (includes transcript check; cached when unchanged)
+mise run transcripts  # force transcript check (no Go test caching)
 ```
 
 Use `bin/wt` for manual experiments. The `transcript` CLI is already on `$PATH`, so run `transcript shell`, `transcript update`, etc., directly when refreshing fixtures. When recording CLI tests, follow `context/transcript.md`. Set `WT_NOW=<RFC3339>` when deterministic relative timestamps are needed (the transcripts rely on this).

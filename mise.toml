@@ -19,4 +19,4 @@ run = "go test ./..."
 [tasks.transcripts]
 depends = ["build"]
 env = { WT_CMDTEST_TIMEOUT = "10s" }
-run = "transcript check transcripts/*.cmdt"
+run = "go test -count=1 -run TestTranscripts ./..."

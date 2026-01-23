@@ -7,7 +7,7 @@ $ WT_SKIP_DEFAULT_ORIGIN=1 wtcmdtest bash -lc 'set -e; cd main; cd ..; git init 
 2 warning: unsupported remote URL: ../remote.git
 1 Will clean up:
 1 - squash-branch (branch squash-branch)
-1     remove worktree /tmp/wt-transcripts/tmprepo/squash-branch
+1     remove worktree /tmp/wt-transcripts/tmprepo-tidy-squash/squash-branch
 1     delete local branch squash-branch
 1     delete remote branch origin/squash-branch
 1

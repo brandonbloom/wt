@@ -1,7 +1,7 @@
 $ wtcmdtest --skip-init -- bash -lc '../bin/wt init'
-1 Converted repository to wt layout at /private/tmp/wt-transcripts/tmprepo
-1 Please cd into /private/tmp/wt-transcripts/tmprepo/main
+1 Converted repository to wt layout at /private/tmp/wt-transcripts/tmprepo-init
+1 Please cd into /private/tmp/wt-transcripts/tmprepo-init/main
 
 $ wtcmdtest --skip-init -- bash -lc 'set -e; ROOT="$PWD"; ../bin/wt init >/dev/null; cd "$ROOT"; rm -rf .wt; ../bin/wt init'
-1 Initialized wt metadata at /tmp/wt-transcripts/tmprepo
-1 Please cd into /tmp/wt-transcripts/tmprepo/main
+1 Initialized wt metadata at /tmp/wt-transcripts/tmprepo-init
+1 Please cd into /tmp/wt-transcripts/tmprepo-init/main

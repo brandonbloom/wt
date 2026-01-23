@@ -43,6 +43,7 @@ func TestTranscripts(t *testing.T) {
 
 			cmd := exec.Command("transcript", "check", path)
 			cmd.Env = append(os.Environ(),
+				"WT_CMDTEST_ID="+name,
 				"WT_CMDTEST_TIMEOUT=60s",
 			)
 

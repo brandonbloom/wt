@@ -2,5 +2,5 @@ $ wtcmdtest --activate-wrapper bash -lc 'set -euo pipefail; cd /tmp; /tmp/wt-tra
 2 run `wt init` to create a project in this directory
 ? 1
 
-$ wtcmdtest --activate-wrapper bash -lc 'set -euo pipefail; cd /tmp; export WT_NOW="2000-01-01T00:00:01Z"; export WT_TEST_SERIAL_FETCH="1"; export WT_PROCESS_TEST_DATA="[]"; /tmp/wt-transcripts/bin/wt -C /tmp/wt-transcripts/tmprepo status | tr -s " " | sed "s/^ *//;s/ *$//"'
+$ wtcmdtest --activate-wrapper bash -lc 'set -euo pipefail; cd /tmp; export WT_NOW="2000-01-01T00:00:01Z"; export WT_TEST_SERIAL_FETCH="1"; export WT_PROCESS_TEST_DATA="[]"; /tmp/wt-transcripts/bin/wt -C /tmp/wt-transcripts/tmprepo-directory_flag status | tr -s " " | sed "s/^ *//;s/ *$//"'
 1 main 1s ago CI✓

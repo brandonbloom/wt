@@ -31,7 +31,7 @@ $ WT_SKIP_DEFAULT_ORIGIN=1 wtcmdtest bash -lc 'set -e; cd main; cd ..; git init 
 1 Plan:
 1 Will clean up:
 1 - safe-branch (branch safe-branch)
-1     remove worktree /tmp/wt-transcripts/tmprepo/safe-branch
+1     remove worktree /tmp/wt-transcripts/tmprepo-tidy-kill/safe-branch
 1     delete local branch safe-branch
 1     delete remote branch origin/safe-branch
 1
@@ -40,7 +40,7 @@ $ WT_SKIP_DEFAULT_ORIGIN=1 wtcmdtest bash -lc 'set -e; cd main; cd ..; git init 
 1 - git remote prune origin
 1
 1 Cleaning safe-branch (branch safe-branch)
-1   removed worktree /tmp/wt-transcripts/tmprepo/safe-branch
+1   removed worktree /tmp/wt-transcripts/tmprepo-tidy-kill/safe-branch
 1   deleted local branch safe-branch
 1 To ../remote.git
 1  - [deleted]         safe-branch

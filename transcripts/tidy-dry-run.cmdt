@@ -11,7 +11,7 @@ $ WT_SKIP_DEFAULT_ORIGIN=1 wtcmdtest bash -lc 'set -e; cd main; cd ..; git init 
 2 warning: unsupported remote URL: ../remote.git
 1 Will clean up:
 1 - safe-branch (branch safe-branch)
-1     remove worktree /tmp/wt-transcripts/tmprepo/safe-branch
+1     remove worktree /tmp/wt-transcripts/tmprepo-tidy-dry-run/safe-branch
 1     delete local branch safe-branch
 1     delete remote branch origin/safe-branch
 1

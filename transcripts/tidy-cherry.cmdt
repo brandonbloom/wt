@@ -7,7 +7,7 @@ $ WT_SKIP_DEFAULT_ORIGIN=1 wtcmdtest bash -lc 'set -e; cd main; cd ..; git init 
 2 warning: unsupported remote URL: ../remote.git
 1 Will clean up:
 1 - duplicate-pr (branch duplicate-pr)
-1     remove worktree /tmp/wt-transcripts/tmprepo/duplicate-pr
+1     remove worktree /tmp/wt-transcripts/tmprepo-tidy-cherry/duplicate-pr
 1     delete local branch duplicate-pr
 1     delete remote branch origin/duplicate-pr
 1

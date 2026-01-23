@@ -18,5 +18,5 @@ $ wtcmdtest bash -lc 'set -e; cd main; ../../bin/wt new busy --base main >/dev/n
 1   - worker (2222)
 1   sending SIGHUP (1) to 2 processes
 1   cleared
-1 [{"pid":3333,"command":"logger","cwd":"/tmp/wt-transcripts/tmprepo/main/../idle","ppid":100}]
+1 [{"pid":3333,"command":"logger","cwd":"/tmp/wt-transcripts/tmprepo-kill/main/../idle","ppid":100}]
 % no-newline

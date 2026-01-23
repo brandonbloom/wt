@@ -1,16 +1,19 @@
 // Implementation of the `wtcmdtest` harness.
 //
 // Key behaviors:
-//   - Creates `/tmp/wt-transcripts/tmprepo` and symlinks `/tmp/wt-transcripts/bin -> <repo>/bin`.
+//   - Creates `/tmp/wt-transcripts/tmprepo-<id>` and symlinks `/tmp/wt-transcripts/bin -> <repo>/bin`.
 //   - Installs a hermetic `gh` stub by copying `bin/wtghstub` into the temp repo as `bin/gh`.
 //   - Seeds deterministic git author/commit timestamps for stable transcripts.
 //   - Honors `WT_CMDTEST_TIMEOUT` (default 10s) to cap setup + command runtime.
+//   - Honors `WT_CMDTEST_ID` to isolate temp repos for parallel tests.
 //   - Honors `WT_SKIP_DEFAULT_ORIGIN=1` to omit the default `origin` remote.
 package main
 
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -24,7 +27,6 @@ import (
 type tool struct {
 	repoRoot        string
 	transcriptsRoot string
-	lockPath        string
 	ghStubBinary    string
 
 	stdin  io.Reader
@@ -56,7 +58,6 @@ func newTool(repoRoot string) *tool {
 	return &tool{
 		repoRoot:        repoRoot,
 		transcriptsRoot: "/tmp/wt-transcripts",
-		lockPath:        "/tmp/wt-transcripts.lock",
 		ghStubBinary:    filepath.Join(repoRoot, "bin", "wtghstub"),
 		stdin:           os.Stdin,
 		stdout:          os.Stdout,
@@ -114,20 +115,12 @@ func (t *tool) run(ctx context.Context, opts options, cmdArgs []string, timeout 
 	if err := os.MkdirAll(t.transcriptsRoot, 0o755); err != nil {
 		return 1, err
 	}
-	unlock, err := acquireLockFile(ctx, t.lockPath, timeout)
-	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			return 124, err
-		}
-		return 1, err
-	}
-	defer unlock()
 
 	if err := t.ensureBinSymlink(); err != nil {
 		return 1, err
 	}
 
-	tmprepo := filepath.Join(t.transcriptsRoot, "tmprepo")
+	tmprepo := filepath.Join(t.transcriptsRoot, tmprepoDirName())
 	if err := removeAllUnder(t.transcriptsRoot, tmprepo); err != nil {
 		return 1, err
 	}
@@ -201,14 +194,25 @@ func (t *tool) ensureBinSymlink() error {
 				return nil
 			}
 		}
-		if err := os.Remove(dst); err != nil {
-			return err
-		}
+		return fmt.Errorf("symlink %s points somewhere else; remove it to continue", dst)
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 
-	return os.Symlink(src, dst)
+	if err := os.Symlink(src, dst); err != nil {
+		if errors.Is(err, os.ErrExist) {
+			if target, err := os.Readlink(dst); err == nil {
+				if !filepath.IsAbs(target) {
+					target = filepath.Join(filepath.Dir(dst), target)
+				}
+				if filepath.Clean(target) == src {
+					return nil
+				}
+			}
+		}
+		return err
+	}
+	return nil
 }
 
 func (t *tool) seedGitRepo(ctx context.Context, dir string, env []string) error {
@@ -372,4 +376,29 @@ func withEnv(env []string, key, value string) []string {
 func getEnv(env []string, key string) string {
 	m := envMap(env)
 	return m[key]
+}
+
+func tmprepoDirName() string {
+	raw := strings.TrimSpace(os.Getenv("WT_CMDTEST_ID"))
+	if raw != "" {
+		safe := make([]rune, 0, len(raw))
+		for _, r := range raw {
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.' {
+				safe = append(safe, r)
+				continue
+			}
+			safe = append(safe, '_')
+		}
+		id := strings.Trim(strings.TrimSpace(string(safe)), "._-")
+		if id != "" {
+			return "tmprepo-" + id
+		}
+	}
+
+	// Fallback: generate a unique, non-guessable ID to avoid collisions in `/tmp`.
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return fmt.Sprintf("tmprepo-%d", os.Getpid())
+	}
+	return "tmprepo-" + hex.EncodeToString(b[:])
 }

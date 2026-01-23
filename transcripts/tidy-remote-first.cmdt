@@ -1,10 +1,10 @@
 $ wtcmdtest bash -lc 'set -e; cd main; cd ..; git init --bare remote.git >/dev/null; remote_url="file://$(pwd)/remote.git"; cd main; git config url."$remote_url".insteadOf git@github.com:brandonbloom/wt.git; git push -u origin main >/dev/null; git fetch origin >/dev/null 2>&1; cd ..; git clone remote.git .wt/other >/dev/null 2>&1; cd .wt/other; echo upstream >>README.md; git add README.md; git commit -m "upstream change" >/dev/null; git push origin main >/dev/null 2>&1; cd ../../main; git fetch origin >/dev/null 2>&1; ../../bin/wt new origin-tip --base origin/main >/dev/null; export PATH="$(pwd)/../bin:$PATH"; WT_NOW=2000-01-10T00:00:00Z ../../bin/wt tidy -n'
-2 To file:///tmp/wt-transcripts/tmprepo/remote.git
+2 To file:///tmp/wt-transcripts/tmprepo-tidy-remote-first/remote.git
 2  * [new branch]      main -> main
 2 Preparing worktree (new branch 'origin-tip')
 1 Will clean up:
 1 - origin-tip (branch origin-tip)
-1     remove worktree /tmp/wt-transcripts/tmprepo/origin-tip
+1     remove worktree /tmp/wt-transcripts/tmprepo-tidy-remote-first/origin-tip
 1     delete local branch origin-tip
 1
 1

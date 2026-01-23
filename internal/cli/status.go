@@ -106,10 +106,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		return resolveGitHubRepo(proj)
 	}()
 
-	{
-		region := trace.StartRegion(ctx, "collect git status")
-		defer region.End()
-
+	err = withTraceRegionErr(ctx, "collect git status", func() error {
 		stashBranches, stashErr := func() (map[string]bool, error) {
 			stashRegion := trace.StartRegion(ctx, "git stash index")
 			defer stashRegion.End()
@@ -178,6 +175,10 @@ func runStatus(cmd *cobra.Command, args []string) error {
 				statuses[i] = collected[i]
 			}
 		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
 	err = withTraceRegionErr(ctx, "collect processes", func() error {

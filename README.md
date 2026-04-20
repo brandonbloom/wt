@@ -4,6 +4,8 @@ My opinionated, personal worktree manager.
 
 If you're not me, you probably don't want to use this.
 
+In fact, I no longer use this myself; all of the major coding harnesses have grown solid first-party worktree support.
+
 ## Features
 
 - **Multi-worktree dashboard** – Live status of all branches, PRs, dirty state, and running processes in one view
